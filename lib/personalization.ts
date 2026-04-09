@@ -1,13 +1,30 @@
-import { mockArticles } from "@/lib/mock-feed";
-import type { RankedArticle, UserProfile } from "@/lib/types";
+import { mockArticles, storyClusters } from "@/lib/mock-feed";
+import type { AppState, RankedArticle, RankingMode, UserProfile } from "@/lib/types";
 
 export function getDefaultProfile(): UserProfile {
   return {
     interests: ["BMW", "Oldtimers", "Sports Cars"],
+    eras: ["90s", "Heritage"],
+    motorsport: ["WEC"],
     regions: ["Europe", "Japan"],
     followedSources: ["Top Gear", "Hagerty"],
+    followedTopics: ["BMW", "Oldtimers", "WEC"],
     mutedTopics: ["SUV gossip"],
+    watchlistModels: ["E46 M3", "911 GT3"],
     sourceStyle: "Balanced",
+    rankingMode: "Balanced",
+  };
+}
+
+export function getDefaultState(): AppState {
+  return {
+    hasCompletedOnboarding: false,
+    profile: getDefaultProfile(),
+    savedStoryIds: [],
+    hiddenStoryIds: [],
+    openedStoryIds: [],
+    hiddenSourceIds: [],
+    currentSurface: "pole-position",
   };
 }
 
@@ -19,35 +36,114 @@ function scoreSourceStyle(articleStyle: RankedArticle["sourceStyle"], profile: U
   return profile.sourceStyle === articleStyle ? 10 : 0;
 }
 
-export function getPersonalizedFeed(profile: UserProfile): RankedArticle[] {
+function scoreRankingMode(mode: RankingMode, article: RankedArticle) {
+  switch (mode) {
+    case "Fresh first":
+      return Math.round(article.freshnessScore * 18);
+    case "Deep cuts":
+      return article.sourceStyle === "Enthusiast-led" || article.eventType === "Feature" ? 14 : 0;
+    case "Motorsport weekend":
+      return article.tags.includes("WEC") || article.tags.includes("Motorsport") ? 25 : 0;
+    case "Collector mode":
+      return article.tags.includes("Oldtimers") || article.tags.includes("Auctions") ? 24 : 0;
+    default:
+      return 0;
+  }
+}
+
+export function getPersonalizedFeed(state: AppState): RankedArticle[] {
+  const { profile, hiddenStoryIds, hiddenSourceIds, savedStoryIds, openedStoryIds } = state;
+
   return mockArticles
+    .filter(
+      (article) =>
+        !hiddenStoryIds.includes(article.id) &&
+        !hiddenSourceIds.includes(article.source) &&
+        !article.tags.some((tag) => profile.mutedTopics.includes(tag)),
+    )
     .map((article) => {
-      const interestMatches = article.tags.filter((tag) => profile.interests.includes(tag));
+      const interestMatches = article.tags.filter((tag) =>
+        profile.interests.includes(tag) || profile.followedTopics.includes(tag),
+      );
+      const eraMatches = article.tags.filter((tag) => profile.eras.includes(tag));
+      const motorsportMatches = article.tags.filter((tag) => profile.motorsport.includes(tag));
       const regionMatches = article.regions.filter((region) => profile.regions.includes(region));
-      const sourceBonus = profile.followedSources.includes(article.source) ? 10 : 0;
-      const mutedPenalty = article.tags.some((tag) => profile.mutedTopics.includes(tag)) ? -100 : 0;
+      const sourceBonus = profile.followedSources.includes(article.source) ? 12 : 0;
+      const saveBonus = savedStoryIds.includes(article.id) ? 8 : 0;
+      const openedBonus = openedStoryIds.includes(article.id) ? 5 : 0;
       const trustBonus = Math.round(article.trustScore * 20);
       const freshnessBonus = Math.round(article.freshnessScore * 15);
       const styleBonus = scoreSourceStyle(article.sourceStyle, profile);
+
+      const baseArticle = {
+        ...article,
+        score: 0,
+        reason: "",
+      };
+
+      const modeBonus = scoreRankingMode(profile.rankingMode, baseArticle);
+
       const score =
-        interestMatches.length * 25 +
-        regionMatches.length * 10 +
+        interestMatches.length * 22 +
+        eraMatches.length * 14 +
+        motorsportMatches.length * 18 +
+        regionMatches.length * 8 +
         sourceBonus +
+        saveBonus +
+        openedBonus +
         trustBonus +
         freshnessBonus +
         styleBonus +
-        mutedPenalty;
+        modeBonus;
 
-      const primaryReason =
-        interestMatches.length > 0
-          ? `Matches ${interestMatches.join(", ")} and comes from a trusted source.`
-          : `Fresh story from ${article.source} with strong trust weighting.`;
+      const reasonParts = [
+        interestMatches[0] ? `Matches ${interestMatches.slice(0, 2).join(" and ")}` : null,
+        eraMatches[0] ? `fits your ${eraMatches[0]} preference` : null,
+        motorsportMatches[0] ? `tracks your ${motorsportMatches[0]} lane` : null,
+        profile.followedSources.includes(article.source) ? `from a followed source` : "trusted source weighting",
+      ].filter((value): value is string => Boolean(value));
 
       return {
-        ...article,
+        ...baseArticle,
         score,
-        reason: primaryReason,
+        reason: `${reasonParts.join(", ")}.`,
       };
     })
     .sort((left, right) => right.score - left.score);
+}
+
+export function getPolePosition(state: AppState) {
+  return getPersonalizedFeed(state)
+    .filter((article) => article.trustScore >= 0.86)
+    .slice(0, 4);
+}
+
+export function getRecommendedTopics(state: AppState) {
+  const topStories = getPersonalizedFeed(state).slice(0, 6);
+  const uniqueTopics = new Set<string>();
+
+  for (const story of topStories) {
+    for (const tag of story.tags) {
+      if (!state.profile.mutedTopics.includes(tag)) {
+        uniqueTopics.add(tag);
+      }
+    }
+  }
+
+  return Array.from(uniqueTopics).slice(0, 8);
+}
+
+export function getClusterStories(clusterId: string, state: AppState) {
+  const cluster = storyClusters.find((entry) => entry.id === clusterId);
+
+  if (!cluster) {
+    return [];
+  }
+
+  const ranked = getPersonalizedFeed(state);
+  const map = new Map(ranked.map((story) => [story.id, story]));
+
+  return cluster.storyIds
+    .map((storyId) => map.get(storyId))
+    .filter((story): story is RankedArticle => Boolean(story));
 }

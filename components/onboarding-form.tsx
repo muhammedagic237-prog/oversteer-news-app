@@ -1,25 +1,42 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
+import { useOversteer } from "@/components/oversteer-provider";
 import {
   eraTopics,
   interestTopics,
   motorsportTopics,
   regionTopics,
   sourceStyles,
+  watchlistModels,
 } from "@/lib/taxonomy";
 
 export function OnboardingForm() {
-  const [selectedInterests, setSelectedInterests] = useState<string[]>([
-    "Sports Cars",
-    "BMW",
-    "Oldtimers",
-  ]);
-  const [selectedEras, setSelectedEras] = useState<string[]>(["90s", "Heritage"]);
-  const [selectedMotorsport, setSelectedMotorsport] = useState<string[]>(["WEC"]);
-  const [selectedRegions, setSelectedRegions] = useState<string[]>(["Europe", "Japan"]);
-  const [sourceStyle, setSourceStyle] = useState("Balanced");
+  const router = useRouter();
+  const { state, hydrated, completeOnboarding } = useOversteer();
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [selectedEras, setSelectedEras] = useState<string[]>([]);
+  const [selectedMotorsport, setSelectedMotorsport] = useState<string[]>([]);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [selectedWatchlist, setSelectedWatchlist] = useState<string[]>([]);
+  const [selectedSourceStyle, setSelectedSourceStyle] = useState<(typeof sourceStyles)[number]>(
+    "Balanced",
+  );
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    setSelectedInterests(state.profile.interests);
+    setSelectedEras(state.profile.eras);
+    setSelectedMotorsport(state.profile.motorsport);
+    setSelectedRegions(state.profile.regions);
+    setSelectedWatchlist(state.profile.watchlistModels);
+    setSelectedSourceStyle(state.profile.sourceStyle);
+  }, [hydrated, state.profile]);
 
   const previewReason = useMemo(() => {
     const joinedInterests = selectedInterests.slice(0, 3).join(", ");
@@ -27,11 +44,32 @@ export function OnboardingForm() {
     const joinedMotorsport = selectedMotorsport.join(", ");
     const joinedRegions = selectedRegions.join(" and ");
 
-    return `The first feed will prioritize ${joinedInterests || "your chosen interests"}, lean into ${joinedEras || "your favorite eras"}, and blend ${joinedMotorsport || "selected motorsport"} coverage from ${joinedRegions || "global"} sources with a ${sourceStyle.toLowerCase()} mix.`;
-  }, [selectedEras, selectedInterests, selectedMotorsport, selectedRegions, sourceStyle]);
+    return `Your lane will prioritize ${joinedInterests || "your chosen interests"}, lean into ${joinedEras || "your favorite eras"}, and blend ${joinedMotorsport || "selected motorsport"} coverage from ${joinedRegions || "global"} sources with a ${selectedSourceStyle.toLowerCase()} mix.`;
+  }, [selectedEras, selectedInterests, selectedMotorsport, selectedRegions, selectedSourceStyle]);
 
   function toggleValue(value: string, current: string[], update: (next: string[]) => void) {
     update(current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
+  }
+
+  function handleComplete() {
+    completeOnboarding({
+      ...state.profile,
+      interests: selectedInterests,
+      eras: selectedEras,
+      motorsport: selectedMotorsport,
+      regions: selectedRegions,
+      watchlistModels: selectedWatchlist,
+      sourceStyle: selectedSourceStyle,
+      followedTopics: Array.from(
+        new Set([...selectedInterests, ...selectedMotorsport, ...state.profile.followedTopics]),
+      ),
+    });
+
+    router.push("/");
+  }
+
+  if (!hydrated) {
+    return null;
   }
 
   return (
@@ -45,9 +83,7 @@ export function OnboardingForm() {
               key={option}
               type="button"
               className={`chip-button ${selectedInterests.includes(option) ? "active" : ""}`}
-              onClick={() =>
-                toggleValue(option, selectedInterests, setSelectedInterests)
-              }
+              onClick={() => toggleValue(option, selectedInterests, setSelectedInterests)}
             >
               {option}
             </button>
@@ -81,9 +117,7 @@ export function OnboardingForm() {
               key={option}
               type="button"
               className={`chip-button ${selectedMotorsport.includes(option) ? "active" : ""}`}
-              onClick={() =>
-                toggleValue(option, selectedMotorsport, setSelectedMotorsport)
-              }
+              onClick={() => toggleValue(option, selectedMotorsport, setSelectedMotorsport)}
             >
               {option}
             </button>
@@ -110,14 +144,31 @@ export function OnboardingForm() {
 
       <div className="form-section">
         <p className="eyebrow">Step 5</p>
+        <h3>Start a watchlist</h3>
+        <div className="chip-row">
+          {watchlistModels.map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={`chip-button ${selectedWatchlist.includes(option) ? "active" : ""}`}
+              onClick={() => toggleValue(option, selectedWatchlist, setSelectedWatchlist)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="form-section">
+        <p className="eyebrow">Step 6</p>
         <h3>Choose source style</h3>
         <div className="chip-row">
           {sourceStyles.map((option) => (
             <button
               key={option}
               type="button"
-              className={`chip-button ${sourceStyle === option ? "active" : ""}`}
-              onClick={() => setSourceStyle(option)}
+              className={`chip-button ${selectedSourceStyle === option ? "active" : ""}`}
+              onClick={() => setSelectedSourceStyle(option)}
             >
               {option}
             </button>
@@ -132,10 +183,10 @@ export function OnboardingForm() {
       </div>
 
       <div className="button-row">
-        <button type="button" className="primary-button">
+        <button type="button" className="primary-button" onClick={handleComplete}>
           Build my feed
         </button>
-        <button type="button" className="secondary-button">
+        <button type="button" className="secondary-button" onClick={() => router.push("/")}>
           Skip for now
         </button>
       </div>

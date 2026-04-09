@@ -1,5 +1,6 @@
 export const primaryTabs = [
   { id: "feed", label: "Feed", href: "/" },
+  { id: "explore", label: "Explore", href: "/explore" },
   { id: "garage", label: "Garage", href: "/garage" },
   { id: "settings", label: "Settings", href: "/settings" },
 ] as const;
