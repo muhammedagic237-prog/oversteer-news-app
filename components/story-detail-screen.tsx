@@ -12,13 +12,14 @@ export function StoryDetailScreen({ storyId }: { storyId: string }) {
   const {
     state,
     hydrated,
+    catalog,
     toggleSavedStory,
     followTopic,
     muteTopic,
     markStoryOpened,
   } = useOversteer();
 
-  const article = getArticleById(storyId);
+  const article = getArticleById(storyId, catalog);
 
   if (!article) {
     return (
@@ -31,9 +32,9 @@ export function StoryDetailScreen({ storyId }: { storyId: string }) {
     );
   }
 
-  const cluster = getClusterById(article.clusterId);
+  const cluster = getClusterById(article.clusterId, catalog);
   const relatedStories = hydrated
-    ? getClusterStories(article.clusterId, state).filter((story) => story.id !== article.id)
+    ? getClusterStories(article.clusterId, state, catalog).filter((story) => story.id !== article.id)
     : [];
 
   useEffect(() => {

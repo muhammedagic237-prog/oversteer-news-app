@@ -31,7 +31,7 @@ body {
   margin: 0;
   min-height: 100vh;
   color: var(--text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Aptos", "Trebuchet MS", sans-serif;
   background: transparent;
 }
 
@@ -64,9 +64,13 @@ button {
 
 .topbar h1,
 .hero-panel h2,
-.info-panel h2 {
+.info-panel h2,
+.news-card h3,
+.preview-panel h4 {
   margin: 0;
   line-height: 1.05;
+  font-family: "Bahnschrift", "Aptos Display", "Trebuchet MS", sans-serif;
+  letter-spacing: -0.03em;
 }
 
 .topbar h1 {
@@ -184,6 +188,31 @@ button {
   background: rgba(17, 19, 21, 0.56);
   color: var(--text);
   font-size: 0.9rem;
+}
+
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(213, 139, 61, 0.24);
+  background: rgba(213, 139, 61, 0.12);
+  color: #ffd5ab;
+  font-size: 0.86rem;
+}
+
+.status-pill.muted {
+  border-color: var(--line);
+  background: rgba(17, 19, 21, 0.56);
+  color: var(--muted);
 }
 
 .pill.muted,

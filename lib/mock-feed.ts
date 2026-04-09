@@ -1,4 +1,4 @@
-import type { Article, StoryCluster } from "@/lib/types";
+import type { Article, FeedCatalog, StoryCluster } from "@/lib/types";
 
 export const sourceCatalog = [
   "Top Gear",
@@ -313,21 +313,33 @@ export const mockArticles: Article[] = [
   },
 ];
 
-export function getArticleById(id: string) {
-  return mockArticles.find((entry) => entry.id === id);
-}
-
-export function getClusterById(id: string) {
-  return storyClusters.find((entry) => entry.id === id);
-}
-
-export function getStoriesForCluster(clusterId: string) {
-  return mockArticles.filter((article) => article.clusterId === clusterId);
-}
-
 export const topicCollections = [
   "BMW compact M cars",
   "90s homologation icons",
   "Endurance racing",
   "Analog sports coupes",
 ];
+
+export const seedFeedCatalog: FeedCatalog = {
+  articles: mockArticles,
+  storyClusters,
+  sourceCatalog: [...sourceCatalog],
+  topicCollections,
+  syncedAt: "2026-04-09T19:12:00.000Z",
+  mode: "seed",
+};
+
+export function getArticleById(id: string, catalog: FeedCatalog = seedFeedCatalog) {
+  return catalog.articles.find((entry) => entry.id === id);
+}
+
+export function getClusterById(id: string, catalog: FeedCatalog = seedFeedCatalog) {
+  return catalog.storyClusters.find((entry) => entry.id === id);
+}
+
+export function getStoriesForCluster(
+  clusterId: string,
+  catalog: FeedCatalog = seedFeedCatalog,
+) {
+  return catalog.articles.filter((article) => article.clusterId === clusterId);
+}

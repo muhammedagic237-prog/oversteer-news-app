@@ -5,10 +5,9 @@ import { useDeferredValue, useMemo, useState } from "react";
 
 import { AppNav } from "@/components/app-nav";
 import { useOversteer } from "@/components/oversteer-provider";
-import { mockArticles, sourceCatalog, storyClusters } from "@/lib/mock-feed";
 
 export function ExploreScreen() {
-  const { followTopic, toggleFollowSource, hydrated } = useOversteer();
+  const { followTopic, toggleFollowSource, hydrated, catalog, feedLoading } = useOversteer();
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
 
@@ -16,15 +15,15 @@ export function ExploreScreen() {
     const normalized = deferredQuery.trim().toLowerCase();
 
     if (!normalized) {
-      return mockArticles.slice(0, 6);
+      return catalog.articles.slice(0, 6);
     }
 
-    return mockArticles.filter((article) =>
+    return catalog.articles.filter((article) =>
       [article.title, article.summary, article.source, ...article.tags].some((value) =>
         value.toLowerCase().includes(normalized),
       ),
     );
-  }, [deferredQuery]);
+  }, [catalog.articles, deferredQuery]);
 
   if (!hydrated) {
     return null;
@@ -56,7 +55,7 @@ export function ExploreScreen() {
         <article className="panel">
           <p className="eyebrow">Topic jumps</p>
           <div className="chip-grid">
-            {storyClusters.map((cluster) => (
+            {catalog.storyClusters.map((cluster) => (
               <Link key={cluster.id} href={`/pit-wall/${cluster.id}`} className="pill">
                 {cluster.title}
               </Link>
@@ -67,7 +66,7 @@ export function ExploreScreen() {
         <article className="panel">
           <p className="eyebrow">Sources</p>
           <div className="chip-grid">
-            {sourceCatalog.map((source) => (
+            {catalog.sourceCatalog.map((source) => (
               <button key={source} type="button" className="pill muted" onClick={() => toggleFollowSource(source)}>
                 {source}
               </button>
@@ -77,6 +76,7 @@ export function ExploreScreen() {
 
         <article className="panel">
           <p className="eyebrow">Search results</p>
+          {feedLoading ? <p className="empty-copy">Refreshing trusted-source coverage...</p> : null}
           <ul className="stack-list">
             {results.map((story) => (
               <li key={story.id} className="list-card align-start">

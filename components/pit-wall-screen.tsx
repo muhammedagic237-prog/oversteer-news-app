@@ -8,8 +8,8 @@ import { getClusterById } from "@/lib/mock-feed";
 import { getClusterStories } from "@/lib/personalization";
 
 export function PitWallScreen({ clusterId }: { clusterId: string }) {
-  const { state, hydrated, markStoryOpened, followTopic } = useOversteer();
-  const cluster = getClusterById(clusterId);
+  const { state, hydrated, catalog, markStoryOpened, followTopic } = useOversteer();
+  const cluster = getClusterById(clusterId, catalog);
 
   if (!cluster) {
     return (
@@ -22,7 +22,7 @@ export function PitWallScreen({ clusterId }: { clusterId: string }) {
     );
   }
 
-  const stories = hydrated ? getClusterStories(cluster.id, state) : [];
+  const stories = hydrated ? getClusterStories(cluster.id, state, catalog) : [];
   const leadStory = stories[0];
 
   return (

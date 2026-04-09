@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { useOversteer } from "@/components/oversteer-provider";
 import { getClusterById } from "@/lib/mock-feed";
 import type { RankedArticle } from "@/lib/types";
 
@@ -45,7 +46,8 @@ export function NewsCard({
   onFollowTopic,
   onMuteTopic,
 }: NewsCardProps) {
-  const cluster = getClusterById(article.clusterId);
+  const { catalog } = useOversteer();
+  const cluster = getClusterById(article.clusterId, catalog);
   const actionTopic = getActionTopic(article);
 
   return (

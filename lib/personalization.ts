@@ -1,5 +1,5 @@
-import { mockArticles, storyClusters } from "@/lib/mock-feed";
-import type { AppState, RankedArticle, RankingMode, UserProfile } from "@/lib/types";
+import { seedFeedCatalog } from "@/lib/mock-feed";
+import type { AppState, FeedCatalog, RankedArticle, RankingMode, UserProfile } from "@/lib/types";
 
 export function getDefaultProfile(): UserProfile {
   return {
@@ -25,6 +25,7 @@ export function getDefaultState(): AppState {
     openedStoryIds: [],
     hiddenSourceIds: [],
     currentSurface: "pole-position",
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -51,10 +52,13 @@ function scoreRankingMode(mode: RankingMode, article: RankedArticle) {
   }
 }
 
-export function getPersonalizedFeed(state: AppState): RankedArticle[] {
+export function getPersonalizedFeed(
+  state: AppState,
+  catalog: FeedCatalog = seedFeedCatalog,
+): RankedArticle[] {
   const { profile, hiddenStoryIds, hiddenSourceIds, savedStoryIds, openedStoryIds } = state;
 
-  return mockArticles
+  return catalog.articles
     .filter(
       (article) =>
         !hiddenStoryIds.includes(article.id) &&
@@ -112,14 +116,17 @@ export function getPersonalizedFeed(state: AppState): RankedArticle[] {
     .sort((left, right) => right.score - left.score);
 }
 
-export function getPolePosition(state: AppState) {
-  return getPersonalizedFeed(state)
+export function getPolePosition(state: AppState, catalog: FeedCatalog = seedFeedCatalog) {
+  return getPersonalizedFeed(state, catalog)
     .filter((article) => article.trustScore >= 0.86)
     .slice(0, 4);
 }
 
-export function getRecommendedTopics(state: AppState) {
-  const topStories = getPersonalizedFeed(state).slice(0, 6);
+export function getRecommendedTopics(
+  state: AppState,
+  catalog: FeedCatalog = seedFeedCatalog,
+) {
+  const topStories = getPersonalizedFeed(state, catalog).slice(0, 6);
   const uniqueTopics = new Set<string>();
 
   for (const story of topStories) {
@@ -133,14 +140,18 @@ export function getRecommendedTopics(state: AppState) {
   return Array.from(uniqueTopics).slice(0, 8);
 }
 
-export function getClusterStories(clusterId: string, state: AppState) {
-  const cluster = storyClusters.find((entry) => entry.id === clusterId);
+export function getClusterStories(
+  clusterId: string,
+  state: AppState,
+  catalog: FeedCatalog = seedFeedCatalog,
+) {
+  const cluster = catalog.storyClusters.find((entry) => entry.id === clusterId);
 
   if (!cluster) {
     return [];
   }
 
-  const ranked = getPersonalizedFeed(state);
+  const ranked = getPersonalizedFeed(state, catalog);
   const map = new Map(ranked.map((story) => [story.id, story]));
 
   return cluster.storyIds

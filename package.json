@@ -8,6 +8,8 @@
     "start": "next start"
   },
   "dependencies": {
+    "@supabase/supabase-js": "latest",
+    "fast-xml-parser": "latest",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest"

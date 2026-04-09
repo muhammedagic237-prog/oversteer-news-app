@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { AppNav } from "@/components/app-nav";
 import { useOversteer } from "@/components/oversteer-provider";
-import { getArticleById, sourceCatalog, topicCollections } from "@/lib/mock-feed";
+import { getArticleById } from "@/lib/mock-feed";
 import { watchlistModels } from "@/lib/taxonomy";
 import type { Article } from "@/lib/types";
 
@@ -16,6 +16,7 @@ export function GarageScreen() {
   const {
     state,
     hydrated,
+    catalog,
     toggleSavedStory,
     followTopic,
     toggleFollowSource,
@@ -24,13 +25,13 @@ export function GarageScreen() {
   } = useOversteer();
 
   const savedStories = state.savedStoryIds
-    .map((storyId) => getArticleById(storyId))
+    .map((storyId) => getArticleById(storyId, catalog))
     .filter(isArticle);
   const recentStories = state.openedStoryIds
-    .map((storyId) => getArticleById(storyId))
+    .map((storyId) => getArticleById(storyId, catalog))
     .filter(isArticle);
   const hiddenStories = state.hiddenStoryIds
-    .map((storyId) => getArticleById(storyId))
+    .map((storyId) => getArticleById(storyId, catalog))
     .filter(isArticle);
 
   if (!hydrated) {
@@ -87,7 +88,7 @@ export function GarageScreen() {
                     {topic}
                   </button>
                 ))
-              : topicCollections.map((topic) => (
+              : catalog.topicCollections.map((topic) => (
                   <button
                     key={topic}
                     type="button"
@@ -119,7 +120,7 @@ export function GarageScreen() {
         <article className="panel">
           <p className="eyebrow">Preferred sources</p>
           <div className="chip-grid">
-            {sourceCatalog.map((source) => (
+            {catalog.sourceCatalog.map((source) => (
               <button
                 key={source}
                 type="button"

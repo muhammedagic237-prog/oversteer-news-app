@@ -11,9 +11,12 @@ export function HomeScreen() {
   const {
     state,
     hydrated,
+    catalog,
     feed,
     polePosition,
     recommendedTopics,
+    sourceReports,
+    feedLoading,
     setSurface,
     toggleSavedStory,
     hideStory,
@@ -24,7 +27,8 @@ export function HomeScreen() {
 
   const activeStories = state.currentSurface === "pole-position" ? polePosition : feed;
   const leadStory = polePosition[0];
-  const leadCluster = leadStory ? getClusterById(leadStory.clusterId) : null;
+  const leadCluster = leadStory ? getClusterById(leadStory.clusterId, catalog) : null;
+  const healthySources = sourceReports.filter((report) => report.ok).length;
 
   if (!hydrated) {
     return (
@@ -61,8 +65,8 @@ export function HomeScreen() {
           </div>
           <div className="hero-actions">
             <p className="hero-copy">
-              The MVP is already live with local persistence. Finish onboarding and your feed,
-              Garage, and settings will start behaving like a real product.
+              The MVP now supports a live feed pipeline with seeded fallback. Finish onboarding
+              and your feed, Garage, and settings will start behaving like a real product.
             </p>
             <Link href="/onboarding" className="primary-button">
               Finish onboarding
@@ -127,6 +131,17 @@ export function HomeScreen() {
               Follow {topic}
             </button>
           ))}
+        </div>
+
+        <div className="status-row">
+          <span className="status-pill">
+            {feedLoading ? "Refreshing feed..." : `${catalog.mode.toUpperCase()} feed`}
+          </span>
+          <span className="status-pill muted">
+            {healthySources > 0
+              ? `${healthySources}/${sourceReports.length} trusted sources healthy`
+              : "Seeded fallback active"}
+          </span>
         </div>
       </section>
 

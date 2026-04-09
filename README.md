@@ -1,76 +1,78 @@
 # Oversteer
 
-Oversteer is a personalized car-news app concept with a vertical, swipe-first feed. Users pick the cars, eras, brands, and motorsport interests they care about, and the app ranks stories by relevance, freshness, and source trust instead of dumping every article into one noisy list.
+Oversteer is a swipe-first car-news app that tries to feel closer to an enthusiast briefing than a generic news reader. Users tune the lane around brands, eras, regions, and motorsport interests, then the app ranks trusted stories by relevance, freshness, and source trust.
 
-This repo now contains:
+## What The MVP Does
 
-- a product specification in [docs/product-spec.md](/C:/Users/HP/Documents/New%20project/oversteer-news-app/docs/product-spec.md)
-- a screen-by-screen UI plan in [docs/ui-plan.md](/C:/Users/HP/Documents/New%20project/oversteer-news-app/docs/ui-plan.md)
-- an app architecture in [docs/app-architecture.md](/C:/Users/HP/Documents/New%20project/oversteer-news-app/docs/app-architecture.md)
-- reference patterns from category leaders in [docs/reference-patterns.md](/C:/Users/HP/Documents/New%20project/oversteer-news-app/docs/reference-patterns.md)
-- a design language in [docs/visual-system.md](/C:/Users/HP/Documents/New%20project/oversteer-news-app/docs/visual-system.md)
-- a starter Next.js app shell for onboarding, feed, garage, and settings
+- pulls live RSS coverage from trusted automotive and motorsport sources
+- falls back to a seeded editorial catalog when feeds are unavailable
+- deduplicates overlapping stories and groups them into `Pit Wall` clusters
+- keeps onboarding choices, saved stories, muted topics, and watchlists in local storage
+- optionally syncs state snapshots and cached feed payloads through Supabase
+- exposes deploy-friendly API routes for feed data, health checks, and snapshot syncing
 
-## Product Direction
-
-The first version should optimize for three things:
-
-1. Trust: only ingest from a vetted publisher list and clearly show the source and publish time.
-2. Relevance: rank stories using the user's selected interests and interaction history.
-3. Flow: make the feed feel effortless, with fullscreen cards and scroll-snapping instead of a cluttered article list.
-
-## Suggested Stack
+## Stack
 
 - Next.js App Router
 - TypeScript
-- CSS variables plus handcrafted styling
-- Supabase for auth, saved stories, topic preferences, and interaction history
-- A background ingestion job for trusted-source fetching, deduplication, and ranking
+- Handcrafted CSS
+- `fast-xml-parser` for RSS parsing
+- Supabase server-side routes for optional persistence
+- Vercel-ready cron warmup via [vercel.json](/C:/Users/HP/Documents/New%20project/oversteer-news-app/vercel.json)
 
-## Starter Structure
+## Live Data Flow
 
-```text
-app/
-  garage/page.tsx
-  onboarding/page.tsx
-  settings/page.tsx
-  globals.css
-  layout.tsx
-  page.tsx
-components/
-  app-nav.tsx
-  feed-shell.tsx
-  news-card.tsx
-  onboarding-form.tsx
-lib/
-  app-shell.ts
-  mock-feed.ts
-  personalization.ts
-  taxonomy.ts
-  types.ts
-docs/
-  app-architecture.md
-  product-spec.md
-  reference-patterns.md
-  ui-plan.md
-  visual-system.md
+1. `GET /api/feed` fetches trusted RSS feeds, scores and normalizes stories, and returns a catalog the client can rank locally.
+2. If all live feeds fail, the API tries a cached Supabase snapshot.
+3. If Supabase is not configured or there is no cached snapshot, the app falls back to the seed catalog in [mock-feed.ts](/C:/Users/HP/Documents/New%20project/oversteer-news-app/lib/mock-feed.ts).
+4. The client provider stores interaction state locally first, then syncs it to Supabase when env vars are present.
+
+## Supabase Setup
+
+Copy [.env.example](/C:/Users/HP/Documents/New%20project/oversteer-news-app/.env.example) to `.env.local` and set:
+
+```bash
+OVERSTEER_FEED_REVALIDATE_SECONDS=900
+NEXT_PUBLIC_SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+OVERSTEER_STATE_TABLE=user_state_snapshots
+OVERSTEER_FEED_TABLE=feed_snapshots
 ```
 
-## Getting Started
+Run the SQL in [001_initial_oversteer.sql](/C:/Users/HP/Documents/New%20project/oversteer-news-app/supabase/migrations/001_initial_oversteer.sql) inside Supabase SQL Editor.
 
-Install dependencies and run the dev server:
+Important: this MVP uses device-based snapshot sync, not full user authentication. That is good enough for preview deployments and single-user testing, but proper multi-user auth should come next.
+
+## Local Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-The current app uses mock data so we can validate the experience before wiring in real source ingestion.
+Useful routes:
 
-## What To Build Next
+- `/` feed
+- `/explore`
+- `/garage`
+- `/settings`
+- `/api/feed`
+- `/api/state`
+- `/api/health`
 
-1. Replace mock articles with a real ingestion pipeline from approved car-news sources.
-2. Persist onboarding selections, saves, mutes, and follows.
-3. Add source deduplication so five articles about the same BMW rumor collapse into one cluster.
-4. Add article detail pages with outbound-source links and related stories.
-5. Add notifications for topic follows, race weekends, and breaking launches.
+## Production Notes
+
+- Vercel cron warms `/api/feed` every 30 minutes.
+- Feed freshness is controlled by `OVERSTEER_FEED_REVALIDATE_SECONDS`.
+- Supabase is optional. Without it, the app still works with local storage plus seeded fallback.
+- `GET /api/health` gives you a quick readiness check after deployment.
+
+## Source Shape
+
+The live pipeline currently leans on official or publisher-hosted RSS endpoints from:
+
+- Motor1
+- Carscoops
+- Motorsport.com
+
+That source list lives in [news-sources.ts](/C:/Users/HP/Documents/New%20project/oversteer-news-app/lib/news-sources.ts) and can be expanded without changing the client UI.

@@ -4,11 +4,14 @@ import {
   createContext,
   useContext,
   useEffect,
+  useEffectEvent,
   useMemo,
   useReducer,
   useState,
 } from "react";
 
+import { createOfflineReport } from "@/lib/news-sources";
+import { seedFeedCatalog } from "@/lib/mock-feed";
 import {
   getDefaultState,
   getPersonalizedFeed,
@@ -17,17 +20,28 @@ import {
 } from "@/lib/personalization";
 import type {
   AppState,
+  FeedCatalog,
+  FeedPayload,
+  FeedSourceReport,
   RankingMode,
+  RemoteSyncStatus,
   SourceStyle,
+  StateSnapshot,
   StorySurface,
   UserProfile,
 } from "@/lib/types";
 
-const STORAGE_KEY = "oversteer.momentum.v1";
+const STORAGE_KEY = "oversteer.momentum.v2";
+const DEVICE_KEY = "oversteer.device-id.v1";
 
 type OversteerContextValue = {
   state: AppState;
   hydrated: boolean;
+  catalog: FeedCatalog;
+  sourceReports: FeedSourceReport[];
+  feedLoading: boolean;
+  syncStatus: RemoteSyncStatus;
+  remoteSyncEnabled: boolean;
   feed: ReturnType<typeof getPersonalizedFeed>;
   polePosition: ReturnType<typeof getPolePosition>;
   recommendedTopics: string[];
@@ -72,55 +86,76 @@ function toggleString(values: string[], target: string) {
     : [...values, target];
 }
 
+function mergeState(candidate?: Partial<AppState> | null): AppState {
+  const defaults = getDefaultState();
+
+  return {
+    ...defaults,
+    ...candidate,
+    profile: {
+      ...defaults.profile,
+      ...candidate?.profile,
+    },
+    updatedAt: candidate?.updatedAt ?? defaults.updatedAt,
+  };
+}
+
+function stampState(nextState: AppState): AppState {
+  return {
+    ...nextState,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "hydrate":
-      return action.payload;
+      return mergeState(action.payload);
     case "completeOnboarding":
-      return {
+      return stampState({
         ...state,
         hasCompletedOnboarding: true,
         profile: action.payload,
-      };
+      });
     case "toggleSavedStory":
-      return {
+      return stampState({
         ...state,
         savedStoryIds: toggleString(state.savedStoryIds, action.payload),
-      };
+      });
     case "hideStory":
       if (state.hiddenStoryIds.includes(action.payload)) {
         return state;
       }
 
-      return {
+      return stampState({
         ...state,
         hiddenStoryIds: [...state.hiddenStoryIds, action.payload],
-      };
+      });
     case "unhideStory":
-      return {
+      return stampState({
         ...state,
         hiddenStoryIds: state.hiddenStoryIds.filter((storyId) => storyId !== action.payload),
-      };
+      });
     case "markStoryOpened":
       if (state.openedStoryIds.includes(action.payload)) {
         return state;
       }
 
-      return {
+      return stampState({
         ...state,
         openedStoryIds: [action.payload, ...state.openedStoryIds].slice(0, 20),
-      };
+      });
     case "followTopic":
-      return {
+      return stampState({
         ...state,
         profile: {
           ...state.profile,
           followedTopics: toggleString(state.profile.followedTopics, action.payload),
           mutedTopics: state.profile.mutedTopics.filter((topic) => topic !== action.payload),
         },
-      };
+      });
     case "muteTopic":
-      return {
+      return stampState({
         ...state,
         profile: {
           ...state.profile,
@@ -129,29 +164,29 @@ function reducer(state: AppState, action: Action): AppState {
             : [...state.profile.mutedTopics, action.payload],
           followedTopics: state.profile.followedTopics.filter((topic) => topic !== action.payload),
         },
-      };
+      });
     case "unmuteTopic":
-      return {
+      return stampState({
         ...state,
         profile: {
           ...state.profile,
           mutedTopics: state.profile.mutedTopics.filter((topic) => topic !== action.payload),
         },
-      };
+      });
     case "toggleFollowSource":
-      return {
+      return stampState({
         ...state,
         profile: {
           ...state.profile,
           followedSources: toggleString(state.profile.followedSources, action.payload),
         },
-      };
+      });
     case "hideSource":
       if (state.hiddenSourceIds.includes(action.payload)) {
         return state;
       }
 
-      return {
+      return stampState({
         ...state,
         hiddenSourceIds: [...state.hiddenSourceIds, action.payload],
         profile: {
@@ -160,41 +195,41 @@ function reducer(state: AppState, action: Action): AppState {
             (source) => source !== action.payload,
           ),
         },
-      };
+      });
     case "unhideSource":
-      return {
+      return stampState({
         ...state,
         hiddenSourceIds: state.hiddenSourceIds.filter((source) => source !== action.payload),
-      };
+      });
     case "toggleWatchlistModel":
-      return {
+      return stampState({
         ...state,
         profile: {
           ...state.profile,
           watchlistModels: toggleString(state.profile.watchlistModels, action.payload),
         },
-      };
+      });
     case "setRankingMode":
-      return {
+      return stampState({
         ...state,
         profile: {
           ...state.profile,
           rankingMode: action.payload,
         },
-      };
+      });
     case "setSourceStyle":
-      return {
+      return stampState({
         ...state,
         profile: {
           ...state.profile,
           sourceStyle: action.payload,
         },
-      };
+      });
     case "setSurface":
-      return {
+      return stampState({
         ...state,
         currentSurface: action.payload,
-      };
+      });
     default:
       return state;
   }
@@ -205,33 +240,129 @@ const OversteerContext = createContext<OversteerContextValue | null>(null);
 export function OversteerProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, getDefaultState);
   const [hydrated, setHydrated] = useState(false);
+  const [catalog, setCatalog] = useState<FeedCatalog>(seedFeedCatalog);
+  const [sourceReports, setSourceReports] = useState<FeedSourceReport[]>([]);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<RemoteSyncStatus>("disabled");
+  const [remoteSyncEnabled, setRemoteSyncEnabled] = useState(false);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+
+  const loadFeed = useEffectEvent(async () => {
+    setFeedLoading(true);
+
+    try {
+      const response = await fetch("/api/feed");
+
+      if (!response.ok) {
+        throw new Error(`Feed request failed with ${response.status}.`);
+      }
+
+      const payload = (await response.json()) as FeedPayload;
+
+      setCatalog(payload.catalog);
+      setSourceReports(payload.reports);
+    } catch {
+      setCatalog(seedFeedCatalog);
+      setSourceReports([
+        createOfflineReport("Feed API unavailable. Using the seeded editorial lane."),
+      ]);
+    } finally {
+      setFeedLoading(false);
+    }
+  });
+
+  const hydrateRemoteState = useEffectEvent(async (resolvedDeviceId: string, localState: AppState) => {
+    try {
+      const response = await fetch(`/api/state?deviceId=${encodeURIComponent(resolvedDeviceId)}`);
+
+      if (!response.ok) {
+        throw new Error(`State request failed with ${response.status}.`);
+      }
+
+      const payload = (await response.json()) as {
+        enabled: boolean;
+        snapshot: StateSnapshot | null;
+      };
+
+      if (!payload.enabled) {
+        setRemoteSyncEnabled(false);
+        setSyncStatus("disabled");
+        return;
+      }
+
+      setRemoteSyncEnabled(true);
+
+      if (payload.snapshot) {
+        const remoteUpdatedAt = new Date(payload.snapshot.updatedAt).valueOf();
+        const localUpdatedAt = new Date(localState.updatedAt).valueOf();
+
+        if (remoteUpdatedAt > localUpdatedAt) {
+          dispatch({ type: "hydrate", payload: mergeState(payload.snapshot.state) });
+        }
+      }
+
+      setSyncStatus("synced");
+    } catch {
+      setRemoteSyncEnabled(false);
+      setSyncStatus("offline");
+    }
+  });
+
+  const syncRemoteState = useEffectEvent(async (snapshot: StateSnapshot) => {
+    if (!remoteSyncEnabled) {
+      return;
+    }
+
+    setSyncStatus("syncing");
+
+    try {
+      const response = await fetch("/api/state", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(snapshot),
+      });
+
+      if (!response.ok) {
+        throw new Error(`State sync failed with ${response.status}.`);
+      }
+
+      setSyncStatus("synced");
+    } catch {
+      setSyncStatus("error");
+    }
+  });
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
+    const localState = (() => {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
 
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<AppState>;
-        const defaults = getDefaultState();
+        if (!raw) {
+          return getDefaultState();
+        }
 
-        dispatch({
-          type: "hydrate",
-          payload: {
-            ...defaults,
-            ...parsed,
-            profile: {
-              ...defaults.profile,
-              ...parsed.profile,
-            },
-          } as AppState,
-        });
+        return mergeState(JSON.parse(raw) as Partial<AppState>);
+      } catch {
+        return getDefaultState();
       }
-    } catch {
-      // Ignore invalid local state and fall back to defaults.
-    } finally {
-      setHydrated(true);
+    })();
+
+    dispatch({ type: "hydrate", payload: localState });
+
+    const storedDeviceId = window.localStorage.getItem(DEVICE_KEY);
+    const resolvedDeviceId = storedDeviceId ?? crypto.randomUUID();
+
+    if (!storedDeviceId) {
+      window.localStorage.setItem(DEVICE_KEY, resolvedDeviceId);
     }
-  }, []);
+
+    setDeviceId(resolvedDeviceId);
+    setHydrated(true);
+    void hydrateRemoteState(resolvedDeviceId, localState);
+    void loadFeed();
+  }, [hydrateRemoteState, loadFeed]);
 
   useEffect(() => {
     if (!hydrated) {
@@ -241,13 +372,34 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [hydrated, state]);
 
+  useEffect(() => {
+    if (!hydrated || !deviceId || !remoteSyncEnabled) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void syncRemoteState({
+        deviceId,
+        state,
+        updatedAt: state.updatedAt,
+      });
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, [deviceId, hydrated, remoteSyncEnabled, state, syncRemoteState]);
+
   const value = useMemo<OversteerContextValue>(
     () => ({
       state,
       hydrated,
-      feed: getPersonalizedFeed(state),
-      polePosition: getPolePosition(state),
-      recommendedTopics: getRecommendedTopics(state),
+      catalog,
+      sourceReports,
+      feedLoading,
+      syncStatus,
+      remoteSyncEnabled,
+      feed: getPersonalizedFeed(state, catalog),
+      polePosition: getPolePosition(state, catalog),
+      recommendedTopics: getRecommendedTopics(state, catalog),
       completeOnboarding: (profile) =>
         dispatch({ type: "completeOnboarding", payload: profile }),
       toggleSavedStory: (storyId) =>
@@ -269,7 +421,15 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
       setSourceStyle: (style) => dispatch({ type: "setSourceStyle", payload: style }),
       setSurface: (surface) => dispatch({ type: "setSurface", payload: surface }),
     }),
-    [hydrated, state],
+    [
+      catalog,
+      feedLoading,
+      hydrated,
+      remoteSyncEnabled,
+      sourceReports,
+      state,
+      syncStatus,
+    ],
   );
 
   return <OversteerContext.Provider value={value}>{children}</OversteerContext.Provider>;

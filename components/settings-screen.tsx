@@ -3,13 +3,15 @@
 import { AppNav } from "@/components/app-nav";
 import { useOversteer } from "@/components/oversteer-provider";
 import { rankingModes } from "@/lib/app-shell";
-import { sourceCatalog } from "@/lib/mock-feed";
 import { sourceStyles } from "@/lib/taxonomy";
 
 export function SettingsScreen() {
   const {
     state,
     hydrated,
+    catalog,
+    syncStatus,
+    remoteSyncEnabled,
     setRankingMode,
     setSourceStyle,
     toggleFollowSource,
@@ -67,7 +69,7 @@ export function SettingsScreen() {
         <article className="panel">
           <p className="eyebrow">Followed sources</p>
           <div className="chip-grid">
-            {sourceCatalog.map((source) => (
+            {catalog.sourceCatalog.map((source) => (
               <button
                 key={source}
                 type="button"
@@ -110,7 +112,7 @@ export function SettingsScreen() {
                 </button>
               ))
             ) : (
-              sourceCatalog.slice(0, 4).map((source) => (
+              catalog.sourceCatalog.slice(0, 4).map((source) => (
                 <button
                   key={source}
                   type="button"
@@ -121,6 +123,21 @@ export function SettingsScreen() {
                 </button>
               ))
             )}
+          </div>
+        </article>
+
+        <article className="panel">
+          <p className="eyebrow">Cloud sync</p>
+          <div className="setting-row">
+            <div>
+              <strong>{remoteSyncEnabled ? "Supabase snapshot sync active" : "Local-first mode"}</strong>
+              <span>
+                {remoteSyncEnabled
+                  ? `Current status: ${syncStatus}.`
+                  : "Set Supabase env vars to sync preferences and saved stories across devices."}
+              </span>
+            </div>
+            <span className="status-pill muted">{syncStatus}</span>
           </div>
         </article>
       </section>

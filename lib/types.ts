@@ -11,6 +11,10 @@ export type StoryEventType = "Launch" | "Race" | "Rumor" | "Auction" | "Feature"
 
 export type StorySurface = "pole-position" | "your-lane";
 
+export type FeedMode = "live" | "cached" | "seed";
+
+export type RemoteSyncStatus = "disabled" | "offline" | "syncing" | "synced" | "error";
+
 export type UserProfile = {
   interests: string[];
   eras: string[];
@@ -53,6 +57,29 @@ export type StoryCluster = {
   timeline: string[];
 };
 
+export type FeedCatalog = {
+  articles: Article[];
+  storyClusters: StoryCluster[];
+  sourceCatalog: string[];
+  topicCollections: string[];
+  syncedAt: string;
+  mode: FeedMode;
+};
+
+export type FeedSourceReport = {
+  id: string;
+  name: string;
+  ok: boolean;
+  articleCount: number;
+  error?: string;
+  fetchedAt: string;
+};
+
+export type FeedPayload = {
+  catalog: FeedCatalog;
+  reports: FeedSourceReport[];
+};
+
 export type RankedArticle = Article & {
   score: number;
   reason: string;
@@ -66,4 +93,11 @@ export type AppState = {
   openedStoryIds: string[];
   hiddenSourceIds: string[];
   currentSurface: StorySurface;
+  updatedAt: string;
+};
+
+export type StateSnapshot = {
+  deviceId: string;
+  state: AppState;
+  updatedAt: string;
 };
