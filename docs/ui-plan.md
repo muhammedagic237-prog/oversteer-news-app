@@ -49,6 +49,18 @@ Behavior:
 - subtle transition between cards
 - no cramped multi-column layouts
 
+## Screen 2A: Pole Position
+
+Goal:
+Give the user a concise daily editorial briefing before or alongside the personalized lane.
+
+Layout:
+
+- lead story
+- top trusted stories row
+- race or launch spotlight
+- jump into personalized lane
+
 ## Screen 3: Story Detail
 
 Goal:
@@ -73,10 +85,24 @@ Sections:
 
 - saved stories
 - followed brands and topics
+- watchlists
 - recent reads
 - source mix
 
-## Screen 5: Settings
+## Screen 5: Pit Wall
+
+Goal:
+Show all relevant angles on one major story without flooding the main feed with duplicates.
+
+Sections:
+
+- lead coverage item
+- official source or press release if available
+- alternate takes
+- timeline of updates
+- related tags and follow controls
+
+## Screen 6: Settings
 
 Goal:
 Let users tune the feed without making the app feel technical.

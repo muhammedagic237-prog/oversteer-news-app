@@ -1,5 +1,6 @@
 import { AppNav } from "@/components/app-nav";
 import { mockSavedStories, preferredSources, topicCollections } from "@/lib/mock-feed";
+import { watchlistModels } from "@/lib/taxonomy";
 
 export default function GaragePage() {
   return (
@@ -44,6 +45,17 @@ export default function GaragePage() {
             {preferredSources.map((source) => (
               <span key={source} className="pill muted">
                 {source}
+              </span>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel">
+          <p className="eyebrow">Watchlists</p>
+          <div className="chip-grid">
+            {watchlistModels.map((model) => (
+              <span key={model} className="pill">
+                {model}
               </span>
             ))}
           </div>

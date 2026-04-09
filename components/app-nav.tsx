@@ -1,17 +1,13 @@
 import Link from "next/link";
 
-type Tab = "feed" | "garage" | "settings";
+import { primaryTabs } from "@/lib/app-shell";
 
-const tabs: Array<{ id: Tab; label: string; href: string }> = [
-  { id: "feed", label: "Feed", href: "/" },
-  { id: "garage", label: "Garage", href: "/garage" },
-  { id: "settings", label: "Settings", href: "/settings" },
-];
+type Tab = (typeof primaryTabs)[number]["id"];
 
 export function AppNav({ current }: { current: Tab }) {
   return (
     <nav className="app-nav" aria-label="Primary">
-      {tabs.map((tab) => (
+      {primaryTabs.map((tab) => (
         <Link
           key={tab.id}
           href={tab.href}

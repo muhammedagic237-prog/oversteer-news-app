@@ -4,8 +4,11 @@ Oversteer is a personalized car-news app concept with a vertical, swipe-first fe
 
 This repo now contains:
 
-- a product specification in [docs/product-spec.md](/C:/Users/HP/Documents/New%20project/docs/product-spec.md)
-- a screen-by-screen UI plan in [docs/ui-plan.md](/C:/Users/HP/Documents/New%20project/docs/ui-plan.md)
+- a product specification in [docs/product-spec.md](/C:/Users/HP/Documents/New%20project/oversteer-news-app/docs/product-spec.md)
+- a screen-by-screen UI plan in [docs/ui-plan.md](/C:/Users/HP/Documents/New%20project/oversteer-news-app/docs/ui-plan.md)
+- an app architecture in [docs/app-architecture.md](/C:/Users/HP/Documents/New%20project/oversteer-news-app/docs/app-architecture.md)
+- reference patterns from category leaders in [docs/reference-patterns.md](/C:/Users/HP/Documents/New%20project/oversteer-news-app/docs/reference-patterns.md)
+- a design language in [docs/visual-system.md](/C:/Users/HP/Documents/New%20project/oversteer-news-app/docs/visual-system.md)
 - a starter Next.js app shell for onboarding, feed, garage, and settings
 
 ## Product Direction
@@ -40,12 +43,17 @@ components/
   news-card.tsx
   onboarding-form.tsx
 lib/
+  app-shell.ts
   mock-feed.ts
   personalization.ts
+  taxonomy.ts
   types.ts
 docs/
+  app-architecture.md
   product-spec.md
+  reference-patterns.md
   ui-plan.md
+  visual-system.md
 ```
 
 ## Getting Started

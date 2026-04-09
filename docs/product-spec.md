@@ -8,6 +8,12 @@ The core question the app should answer is:
 
 "What are the most relevant, credible car stories for me right now?"
 
+See also:
+
+- [docs/app-architecture.md](/C:/Users/HP/Documents/New%20project/oversteer-news-app/docs/app-architecture.md)
+- [docs/reference-patterns.md](/C:/Users/HP/Documents/New%20project/oversteer-news-app/docs/reference-patterns.md)
+- [docs/visual-system.md](/C:/Users/HP/Documents/New%20project/oversteer-news-app/docs/visual-system.md)
+
 ## Audience
 
 Primary audiences:
@@ -49,6 +55,10 @@ Based on current digital-news trends, the most important needs are:
 - less overload and more filtering so the feed feels useful instead of exhausting
 
 ## MVP Features
+
+### 0. Pole Position
+
+The app should open with a daily editorial lead that highlights the most important trusted stories before the user falls into the endless personalized scroll.
 
 ### 1. Onboarding and Interest Graph
 
@@ -109,6 +119,7 @@ The Garage is the user's collection area:
 
 - saved stories
 - followed brands and topics
+- watchlisted models
 - recently opened stories
 - source preferences
 
@@ -119,7 +130,7 @@ Users can tune:
 - notification cadence
 - countries and source language
 - topic follows and mutes
-- "freshness vs depth" ranking preference
+- ranking modes such as balanced, fresh first, deep cuts, and collector mode
 - "mainstream vs enthusiast" source mix
 
 ## Post-MVP Features

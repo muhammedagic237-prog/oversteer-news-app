@@ -1,4 +1,5 @@
 import { AppNav } from "@/components/app-nav";
+import { rankingModes } from "@/lib/app-shell";
 
 const mutedTopics = ["SUV gossip", "EV startup rumors"];
 
@@ -26,6 +27,13 @@ export default function SettingsPage() {
           <div className="setting-row">
             <span>Duplicate stories</span>
             <strong>Clustered</strong>
+          </div>
+          <div className="chip-grid" style={{ marginTop: 12 }}>
+            {rankingModes.map((mode) => (
+              <span key={mode} className="pill muted">
+                {mode}
+              </span>
+            ))}
           </div>
         </article>
 
