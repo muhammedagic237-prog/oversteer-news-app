@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
 
 import { getDefaultState } from "@/lib/personalization";
-import { isSupabaseEnabled, loadStateSnapshot, saveStateSnapshot } from "@/lib/supabase";
-import type { AppState, StateSnapshot } from "@/lib/types";
+import { createSupabaseServerClient } from "@/lib/supabase-auth";
+import {
+  isSupabaseAuthEnabled,
+  isSupabaseServiceEnabled,
+  loadDeviceStateSnapshot,
+  loadUserAppState,
+  loadViewer,
+  saveDeviceStateSnapshot,
+  saveUserAppState,
+} from "@/lib/supabase";
+import type { AppState, StateBootstrapPayload, StateSnapshot, Viewer } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -39,21 +48,80 @@ function isAppState(value: unknown): value is AppState {
   );
 }
 
+async function getAuthenticatedViewer() {
+  if (!isSupabaseAuthEnabled()) {
+    return null;
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  if (!supabase) {
+    return null;
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !user.email) {
+    return null;
+  }
+
+  const storedViewer = await loadViewer(user.id);
+
+  return (
+    storedViewer ?? {
+      id: user.id,
+      email: user.email,
+      displayName: (user.user_metadata?.display_name as string | undefined) ?? null,
+      avatarUrl: (user.user_metadata?.avatar_url as string | undefined) ?? null,
+    }
+  ) satisfies Viewer;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const deviceId = searchParams.get("deviceId");
+  const authEnabled = isSupabaseAuthEnabled();
+  const viewer = await getAuthenticatedViewer();
 
-  if (!deviceId) {
-    return NextResponse.json({ error: "Missing deviceId." }, { status: 400 });
+  if (viewer && isSupabaseServiceEnabled()) {
+    const state = await loadUserAppState(viewer.id);
+
+    return NextResponse.json({
+      enabled: true,
+      authEnabled,
+      persistenceMode: "account",
+      snapshot: state
+        ? {
+            deviceId: `account:${viewer.id}`,
+            state,
+            updatedAt: state.updatedAt,
+          }
+        : null,
+      viewer,
+    } satisfies StateBootstrapPayload);
   }
 
-  if (!isSupabaseEnabled()) {
-    return NextResponse.json({ enabled: false, snapshot: null });
+  if (deviceId && isSupabaseServiceEnabled()) {
+    const snapshot = await loadDeviceStateSnapshot(deviceId);
+
+    return NextResponse.json({
+      enabled: true,
+      authEnabled,
+      persistenceMode: "device",
+      snapshot,
+      viewer,
+    } satisfies StateBootstrapPayload);
   }
 
-  const snapshot = await loadStateSnapshot(deviceId);
-
-  return NextResponse.json({ enabled: true, snapshot });
+  return NextResponse.json({
+    enabled: false,
+    authEnabled,
+    persistenceMode: "disabled",
+    snapshot: null,
+    viewer,
+  } satisfies StateBootstrapPayload);
 }
 
 export async function PUT(request: Request) {
@@ -63,8 +131,30 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Invalid state payload." }, { status: 400 });
   }
 
-  if (!isSupabaseEnabled()) {
-    return NextResponse.json({ enabled: false }, { status: 503 });
+  const viewer = await getAuthenticatedViewer();
+
+  if (viewer && isSupabaseServiceEnabled()) {
+    const saved = await saveUserAppState(viewer, body.state);
+
+    if (!saved) {
+      return NextResponse.json({ enabled: true, saved: false }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      enabled: true,
+      saved: true,
+      persistenceMode: "account",
+      viewer,
+    });
+  }
+
+  if (!isSupabaseServiceEnabled()) {
+    return NextResponse.json({
+      enabled: false,
+      saved: false,
+      persistenceMode: "disabled",
+      viewer,
+    });
   }
 
   const snapshot = {
@@ -73,11 +163,16 @@ export async function PUT(request: Request) {
     updatedAt: body.updatedAt ?? body.state.updatedAt,
   } satisfies StateSnapshot;
 
-  const saved = await saveStateSnapshot(snapshot);
+  const saved = await saveDeviceStateSnapshot(snapshot);
 
   if (!saved) {
     return NextResponse.json({ enabled: true, saved: false }, { status: 500 });
   }
 
-  return NextResponse.json({ enabled: true, saved: true });
+  return NextResponse.json({
+    enabled: true,
+    saved: true,
+    persistenceMode: "device",
+    viewer,
+  });
 }

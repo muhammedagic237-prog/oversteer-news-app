@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 
 import { useOversteer } from "@/components/oversteer-provider";
 import {
@@ -52,20 +52,22 @@ export function OnboardingForm() {
   }
 
   function handleComplete() {
-    completeOnboarding({
-      ...state.profile,
-      interests: selectedInterests,
-      eras: selectedEras,
-      motorsport: selectedMotorsport,
-      regions: selectedRegions,
-      watchlistModels: selectedWatchlist,
-      sourceStyle: selectedSourceStyle,
-      followedTopics: Array.from(
-        new Set([...selectedInterests, ...selectedMotorsport, ...state.profile.followedTopics]),
-      ),
-    });
+    startTransition(() => {
+      completeOnboarding({
+        ...state.profile,
+        interests: selectedInterests,
+        eras: selectedEras,
+        motorsport: selectedMotorsport,
+        regions: selectedRegions,
+        watchlistModels: selectedWatchlist,
+        sourceStyle: selectedSourceStyle,
+        followedTopics: Array.from(
+          new Set([...selectedInterests, ...selectedMotorsport, ...state.profile.followedTopics]),
+        ),
+      });
 
-    router.push("/");
+      router.push("/");
+    });
   }
 
   if (!hydrated) {

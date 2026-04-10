@@ -22,6 +22,18 @@ export function FeedShell({
   onFollowTopic,
   onMuteTopic,
 }: FeedShellProps) {
+  if (articles.length === 0) {
+    return (
+      <section className="panel">
+        <p className="eyebrow">Quiet lane</p>
+        <h2 className="section-title">No stories match this lane right now.</h2>
+        <p className="empty-copy">
+          Try switching feed mode, unmuting a topic, or broadening your regions and interests.
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section className="feed-shell" aria-label="Personalized story feed">
       {articles.map((article) => (

@@ -49,22 +49,28 @@ export function NewsCard({
   const { catalog } = useOversteer();
   const cluster = getClusterById(article.clusterId, catalog);
   const actionTopic = getActionTopic(article);
+  const mediaStyle = article.imageUrl
+    ? {
+        backgroundImage: `linear-gradient(180deg, rgba(7, 8, 10, 0.08) 0%, rgba(7, 8, 10, 0.84) 82%, rgba(7, 8, 10, 0.95) 100%), url(${article.imageUrl})`,
+      }
+    : {
+        background: article.heroGradient,
+      };
 
   return (
-    <article
-      className="news-card"
-      style={{
-        background: article.heroGradient,
-      }}
-    >
+    <article className="news-card">
+      <div className="news-card-media" style={mediaStyle} />
       <div className="news-card-content">
         <div className="news-card-header">
           <span className="source-pill">{article.source}</span>
           <span className="source-pill muted">{article.publishedAgo}</span>
           <span className="source-pill muted">{article.eventType}</span>
+          {article.primaryTopic ? (
+            <span className="source-pill muted">{article.primaryTopic}</span>
+          ) : null}
           {cluster ? (
             <Link href={`/pit-wall/${cluster.id}`} className="source-pill muted">
-              {cluster.storyIds.length} viewpoints
+              {(cluster.storyCount ?? cluster.storyIds.length)} viewpoints
             </Link>
           ) : null}
         </div>
@@ -73,6 +79,12 @@ export function NewsCard({
           <h3>{article.title}</h3>
           <p className="story-summary">{article.summary}</p>
           <p className="story-deck">{article.deck}</p>
+        </div>
+
+        <div className="metric-row">
+          <span>{Math.round(article.trustScore * 100)} trust</span>
+          <span>{Math.round((article.qualityScore ?? article.freshnessScore) * 100)} quality</span>
+          <span>{article.clusterLabel ?? "Single angle"}</span>
         </div>
 
         <div className="chip-grid">

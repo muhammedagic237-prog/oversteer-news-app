@@ -41,6 +41,14 @@ export function PitWallScreen({ clusterId }: { clusterId: string }) {
         </div>
         <div className="hero-actions">
           <p className="hero-copy">{cluster.description}</p>
+          <div className="status-row">
+            <span className="status-pill">{cluster.storyCount ?? stories.length} stories</span>
+            {cluster.sourceNames?.slice(0, 3).map((source) => (
+              <span key={source} className="status-pill muted">
+                {source}
+              </span>
+            ))}
+          </div>
           <div className="button-row">
             <button type="button" className="primary-button" onClick={() => followTopic(cluster.topic)}>
               Follow {cluster.topic}

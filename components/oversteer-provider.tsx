@@ -9,6 +9,7 @@ import {
   useReducer,
   useState,
 } from "react";
+import { usePathname } from "next/navigation";
 
 import { createOfflineReport } from "@/lib/news-sources";
 import { seedFeedCatalog } from "@/lib/mock-feed";
@@ -23,12 +24,15 @@ import type {
   FeedCatalog,
   FeedPayload,
   FeedSourceReport,
+  PersistenceMode,
   RankingMode,
   RemoteSyncStatus,
   SourceStyle,
+  StateBootstrapPayload,
   StateSnapshot,
   StorySurface,
   UserProfile,
+  Viewer,
 } from "@/lib/types";
 
 const STORAGE_KEY = "oversteer.momentum.v2";
@@ -42,6 +46,9 @@ type OversteerContextValue = {
   feedLoading: boolean;
   syncStatus: RemoteSyncStatus;
   remoteSyncEnabled: boolean;
+  persistenceMode: PersistenceMode;
+  authEnabled: boolean;
+  viewer: Viewer | null;
   feed: ReturnType<typeof getPersonalizedFeed>;
   polePosition: ReturnType<typeof getPolePosition>;
   recommendedTopics: string[];
@@ -244,8 +251,11 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
   const [sourceReports, setSourceReports] = useState<FeedSourceReport[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
   const [syncStatus, setSyncStatus] = useState<RemoteSyncStatus>("disabled");
-  const [remoteSyncEnabled, setRemoteSyncEnabled] = useState(false);
+  const [authEnabled, setAuthEnabled] = useState(false);
+  const [viewer, setViewer] = useState<Viewer | null>(null);
+  const [persistenceMode, setPersistenceMode] = useState<PersistenceMode>("disabled");
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  const pathname = usePathname();
 
   const loadFeed = useEffectEvent(async () => {
     setFeedLoading(true);
@@ -271,6 +281,8 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
+  const remoteSyncEnabled = persistenceMode !== "disabled";
+
   const hydrateRemoteState = useEffectEvent(async (resolvedDeviceId: string, localState: AppState) => {
     try {
       const response = await fetch(`/api/state?deviceId=${encodeURIComponent(resolvedDeviceId)}`);
@@ -279,18 +291,16 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
         throw new Error(`State request failed with ${response.status}.`);
       }
 
-      const payload = (await response.json()) as {
-        enabled: boolean;
-        snapshot: StateSnapshot | null;
-      };
+      const payload = (await response.json()) as StateBootstrapPayload;
+
+      setAuthEnabled(payload.authEnabled);
+      setViewer(payload.viewer);
+      setPersistenceMode(payload.persistenceMode);
 
       if (!payload.enabled) {
-        setRemoteSyncEnabled(false);
         setSyncStatus("disabled");
         return;
       }
-
-      setRemoteSyncEnabled(true);
 
       if (payload.snapshot) {
         const remoteUpdatedAt = new Date(payload.snapshot.updatedAt).valueOf();
@@ -303,7 +313,7 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
 
       setSyncStatus("synced");
     } catch {
-      setRemoteSyncEnabled(false);
+      setPersistenceMode("disabled");
       setSyncStatus("offline");
     }
   });
@@ -360,9 +370,16 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
 
     setDeviceId(resolvedDeviceId);
     setHydrated(true);
-    void hydrateRemoteState(resolvedDeviceId, localState);
     void loadFeed();
-  }, [hydrateRemoteState, loadFeed]);
+  }, [loadFeed]);
+
+  useEffect(() => {
+    if (!hydrated || !deviceId) {
+      return;
+    }
+
+    void hydrateRemoteState(deviceId, state);
+  }, [deviceId, hydrated, hydrateRemoteState, pathname]);
 
   useEffect(() => {
     if (!hydrated) {
@@ -397,6 +414,9 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
       feedLoading,
       syncStatus,
       remoteSyncEnabled,
+      persistenceMode,
+      authEnabled,
+      viewer,
       feed: getPersonalizedFeed(state, catalog),
       polePosition: getPolePosition(state, catalog),
       recommendedTopics: getRecommendedTopics(state, catalog),
@@ -423,12 +443,15 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       catalog,
+      authEnabled,
       feedLoading,
       hydrated,
+      persistenceMode,
       remoteSyncEnabled,
       sourceReports,
       state,
       syncStatus,
+      viewer,
     ],
   );
 

@@ -18,16 +18,17 @@ import type {
 } from "@/lib/types";
 
 const HERO_GRADIENTS = [
-  "linear-gradient(135deg, #42515f 0%, #1d232b 44%, #0f1215 100%)",
-  "linear-gradient(135deg, #7c5a43 0%, #271e19 44%, #0f1114 100%)",
-  "linear-gradient(135deg, #5b3f34 0%, #201a17 42%, #0f1113 100%)",
-  "linear-gradient(135deg, #3f4f5e 0%, #172028 44%, #0f1215 100%)",
-  "linear-gradient(135deg, #5a5b63 0%, #22242a 44%, #111315 100%)",
+  "linear-gradient(135deg, #5f6d7d 0%, #1d232b 42%, #0c1014 100%)",
+  "linear-gradient(135deg, #8a6548 0%, #2b211a 42%, #101215 100%)",
+  "linear-gradient(135deg, #495d6f 0%, #1c262f 42%, #0d1114 100%)",
+  "linear-gradient(135deg, #5d4a43 0%, #231b18 42%, #0f1114 100%)",
+  "linear-gradient(135deg, #5f616b 0%, #22242a 42%, #101214 100%)",
 ];
 
 const FEED_REVALIDATE_SECONDS = Number(process.env.OVERSTEER_FEED_REVALIDATE_SECONDS ?? 900);
 const MAX_ITEMS_PER_SOURCE = 10;
 const MAX_ARTICLES = 28;
+const MIN_QUALITY_SCORE = 0.58;
 const AUXILIARY_TAGS = new Set([
   "Modern",
   "Heritage",
@@ -42,6 +43,7 @@ const AUXILIARY_TAGS = new Set([
   "90s",
   "80s",
   "70s",
+  "Motorsport",
 ]);
 const STOP_WORDS = new Set([
   "the",
@@ -68,7 +70,35 @@ const STOP_WORDS = new Set([
   "why",
   "how",
   "what",
+  "more",
+  "than",
+  "when",
 ]);
+const NOISE_TOKENS = new Set([
+  "news",
+  "review",
+  "feature",
+  "first",
+  "drive",
+  "drives",
+  "latest",
+  "explained",
+  "video",
+  "photos",
+  "gallery",
+  "watch",
+  "details",
+  "preview",
+  "briefing",
+]);
+const LOW_SIGNAL_PATTERNS = [
+  /top\s+\d+/i,
+  /best .* to buy/i,
+  /rendered by/i,
+  /photo gallery/i,
+  /spy photographer/i,
+  /opinion:/i,
+];
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -150,7 +180,7 @@ function trimSentence(value: string, maxLength: number) {
     return compact;
   }
 
-  return `${compact.slice(0, maxLength - 1).trimEnd()}…`;
+  return `${compact.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
 function deriveSummary(summary: string, title: string) {
@@ -199,7 +229,7 @@ function deriveRegions(text: string, source: TrustedFeedSource) {
     tags.add("Japan");
   }
 
-  if (/(europe|germany|italy|france|britain|uk|porsche|bmw|mercedes|audi)/.test(normalized)) {
+  if (/(europe|germany|italy|france|britain|uk|porsche|bmw|mercedes|audi|ferrari|lancia)/.test(normalized)) {
     tags.add("Europe");
   }
 
@@ -222,12 +252,20 @@ function deriveEraTags(text: string) {
     tags.add("Heritage");
   }
 
-  if (/\b(199\d|2000|2001|2002|2003|2004|2005|2006|2007|2008|2009)\b/.test(normalized)) {
+  if (/\b(2000|2001|2002|2003|2004|2005|2006|2007|2008|2009)\b/.test(normalized)) {
     tags.add("2000s");
   }
 
-  if (/\b(198\d|199\d)\b/.test(normalized)) {
-    tags.add(/\b198\d\b/.test(normalized) ? "80s" : "90s");
+  if (/\b199\d\b/.test(normalized)) {
+    tags.add("90s");
+  }
+
+  if (/\b198\d\b/.test(normalized)) {
+    tags.add("80s");
+  }
+
+  if (/\b197\d\b/.test(normalized)) {
+    tags.add("70s");
   }
 
   if (tags.size === 0 && !/(classic|heritage|retro)/.test(normalized)) {
@@ -243,19 +281,19 @@ function deriveInterestTags(text: string, source: TrustedFeedSource) {
 
   const topicRules: Array<[RegExp, string[]]> = [
     [/\bbmw\b|\bm[23458]\b/, ["BMW", "Sports Cars"]],
-    [/\bporsche\b|gt3|gt2|carrera|turbo s/, ["Porsche", "Sports Cars"]],
+    [/\bporsche\b|gt3|gt2|carrera|turbo s|911/, ["Porsche", "Sports Cars"]],
     [/\btoyota\b|\bnissan\b|\bhonda\b|\bsubaru\b|\bmazda\b|\blexus\b|skyline|supra|nsx|integra/, ["JDM"]],
     [/\brestomod\b|continuation/, ["Restomods", "Oldtimers"]],
     [/\bauction\b|collector|price guide|barn find|sold for/, ["Auctions"]],
     [/\bferrari\b|\blamborghini\b|\bmclaren\b|\bbugatti\b|\bpagani\b/, ["Supercars", "Sports Cars"]],
-    [/\bhot hatch\b|civic type r|golf r|gti|yaris gr|focus rs/, ["Hot Hatches"]],
+    [/\bhot hatch\b|civic type r|golf r|gti|yaris gr|focus rs|mini jcworks/, ["Hot Hatches"]],
     [/\boff-road\b|land cruiser|bronco|defender|wrangler/, ["Off-road"]],
-    [/\bf1\b|formula 1|australian gp|grand prix/, ["F1", "Motorsport"]],
+    [/\bf1\b|formula 1|grand prix/, ["F1", "Motorsport"]],
     [/\bwec\b|le mans|hypercar|endurance/, ["WEC", "Motorsport"]],
     [/\brally\b|\bwrc\b|integrale|group a/, ["Rally", "Motorsport"]],
     [/\bgt3\b/, ["GT3", "Motorsport"]],
     [/\bclassic\b|vintage|oldtimer|air-cooled|heritage/, ["Oldtimers"]],
-    [/\bcoupe\b|roadster|track pack|sports car/, ["Sports Cars"]],
+    [/\bcoupe\b|roadster|track pack|sports car|supercar/, ["Sports Cars"]],
   ];
 
   for (const [pattern, mappedTags] of topicRules) {
@@ -291,7 +329,38 @@ function toTopicCollectionLabel(topic: string) {
 }
 
 function getPrimaryTopic(article: Article) {
-  return article.tags.find((tag) => !AUXILIARY_TAGS.has(tag)) ?? article.tags[0] ?? "Cars";
+  return article.primaryTopic ?? article.tags.find((tag) => !AUXILIARY_TAGS.has(tag)) ?? article.tags[0] ?? "Cars";
+}
+
+function deriveClusterDescriptor(title: string, primaryTopic: string) {
+  const normalizedTopic = slugify(primaryTopic);
+
+  return tokenizeTitle(title)
+    .filter((token) => !NOISE_TOKENS.has(token) && slugify(token) !== normalizedTopic)
+    .slice(0, 2)
+    .join("-");
+}
+
+function computeQualityScore(article: Pick<Article, "trustScore" | "freshnessScore" | "summary" | "primaryTopic" | "imageUrl">) {
+  const summaryBonus = article.summary.length >= 100 ? 0.12 : article.summary.length >= 60 ? 0.07 : 0.02;
+  const entityBonus = article.primaryTopic && article.primaryTopic !== "Cars" ? 0.1 : 0;
+  const imageBonus = article.imageUrl ? 0.04 : 0;
+
+  return Number(
+    clamp(article.trustScore * 0.5 + article.freshnessScore * 0.24 + summaryBonus + entityBonus + imageBonus, 0, 0.99).toFixed(2),
+  );
+}
+
+function isRelevantAutomotiveStory(article: Article) {
+  const combinedText = `${article.title} ${article.summary}`.toLowerCase();
+
+  if (LOW_SIGNAL_PATTERNS.some((pattern) => pattern.test(combinedText))) {
+    return false;
+  }
+
+  const specificTopicCount = article.tags.filter((tag) => !AUXILIARY_TAGS.has(tag)).length;
+
+  return specificTopicCount > 0 && (article.qualityScore ?? computeQualityScore(article)) >= MIN_QUALITY_SCORE;
 }
 
 function isDuplicateStory(candidate: Article, accepted: Article[]) {
@@ -304,7 +373,9 @@ function isDuplicateStory(candidate: Article, accepted: Article[]) {
       return true;
     }
 
-    if (candidateTopic !== getPrimaryTopic(existing)) {
+    const existingTopic = getPrimaryTopic(existing);
+
+    if (candidateTopic !== existingTopic && candidate.eventType !== existing.eventType) {
       return false;
     }
 
@@ -312,7 +383,7 @@ function isDuplicateStory(candidate: Article, accepted: Article[]) {
     const overlap = candidateTokens.filter((token) => existingTokens.includes(token)).length;
     const similarity = overlap / Math.max(1, Math.min(candidateTokens.length, existingTokens.length));
 
-    return similarity >= 0.8;
+    return similarity >= 0.76;
   });
 }
 
@@ -321,7 +392,8 @@ function buildClusters(articles: Article[]): { articles: Article[]; storyCluster
 
   for (const article of articles) {
     const topic = getPrimaryTopic(article);
-    const key = slugify(topic || article.id) || article.id;
+    const descriptor = deriveClusterDescriptor(article.title, topic);
+    const key = `${slugify(topic || article.id)}-${slugify(article.eventType)}-${descriptor || "main"}`;
     const existing = grouped.get(key) ?? [];
 
     existing.push(article);
@@ -338,18 +410,29 @@ function buildClusters(articles: Article[]): { articles: Article[]; storyCluster
     const leadStory = sortedGroup[0];
     const topic = getPrimaryTopic(leadStory);
     const clusterId = `${key}-cluster`;
+    const descriptor = deriveClusterDescriptor(leadStory.title, topic);
+    const clusterLabel = descriptor
+      .split("-")
+      .filter(Boolean)
+      .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+      .join(" ");
 
     storyClusters.push({
       id: clusterId,
-      title: sortedGroup.length > 1 ? `${topic} full coverage` : `${topic} story brief`,
+      title:
+        sortedGroup.length > 1
+          ? `${topic}${clusterLabel ? `: ${clusterLabel}` : ""}`
+          : `${topic} story brief`,
       description:
         sortedGroup.length > 1
-          ? `${sortedGroup.length} relevant stories grouped around ${topic.toLowerCase()} so users can see the main angle and the deeper cuts together.`
+          ? `${sortedGroup.length} relevant stories grouped around ${topic.toLowerCase()}${clusterLabel ? ` and ${clusterLabel.toLowerCase()}` : ""} so users can scan the main angle and the sharper follow-ups together.`
           : `Single-story briefing for ${topic.toLowerCase()} until more viewpoints land in the lane.`,
       topic,
       leadStoryId: leadStory.id,
       storyIds: sortedGroup.map((story) => story.id),
       timeline: sortedGroup.slice(0, 3).map((story) => `${story.publishedAgo}: ${story.title}`),
+      storyCount: sortedGroup.length,
+      sourceNames: Array.from(new Set(sortedGroup.map((story) => story.source))),
     });
 
     for (const story of sortedGroup) {
@@ -357,11 +440,19 @@ function buildClusters(articles: Article[]): { articles: Article[]; storyCluster
     }
   }
 
+  const clusterMap = new Map(storyClusters.map((cluster) => [cluster.id, cluster]));
+
   return {
-    articles: articles.map((article) => ({
-      ...article,
-      clusterId: clusterIdByStoryId.get(article.id) ?? article.clusterId,
-    })),
+    articles: articles.map((article) => {
+      const clusterId = clusterIdByStoryId.get(article.id) ?? article.clusterId;
+      const cluster = clusterMap.get(clusterId);
+
+      return {
+        ...article,
+        clusterId,
+        clusterLabel: cluster?.title ?? article.clusterLabel,
+      };
+    }),
     storyClusters: storyClusters.sort((left, right) => left.title.localeCompare(right.title)),
   };
 }
@@ -372,7 +463,7 @@ async function fetchSource(source: TrustedFeedSource) {
   try {
     const response = await fetch(source.feedUrl, {
       headers: {
-        "user-agent": "OversteerBot/0.1 (+https://github.com/muhammedagic237-prog/oversteer-news-app)",
+        "user-agent": "OversteerBot/0.2 (+https://github.com/muhammedagic237-prog/oversteer-news-app)",
       },
       next: { revalidate: FEED_REVALIDATE_SECONDS },
     });
@@ -411,7 +502,10 @@ async function fetchSource(source: TrustedFeedSource) {
   }
 }
 
-function buildArticleFromFeed(source: TrustedFeedSource, item: Awaited<ReturnType<typeof fetchSource>>["items"][number]) {
+function buildArticleFromFeed(
+  source: TrustedFeedSource,
+  item: Awaited<ReturnType<typeof fetchSource>>["items"][number],
+) {
   const publishedAt = normalizePublishedAt(item.publishedAt);
   const summary = deriveSummary(item.summary, item.title);
   const tags = Array.from(
@@ -420,10 +514,11 @@ function buildArticleFromFeed(source: TrustedFeedSource, item: Awaited<ReturnTyp
       ...deriveEraTags(`${item.title} ${item.summary}`),
     ]),
   );
+  const primaryTopic =
+    tags.find((tag) => !AUXILIARY_TAGS.has(tag)) ?? tags[0] ?? source.defaultTags[0] ?? "Cars";
   const eventType = deriveEventType(`${item.title} ${item.summary}`);
   const articleSeed = `${source.publisherName}-${item.title}-${item.link}`;
-
-  return {
+  const article = {
     id: slugify(articleSeed).slice(0, 64) || `story-${hashString(articleSeed)}`,
     title: item.title,
     summary,
@@ -439,7 +534,15 @@ function buildArticleFromFeed(source: TrustedFeedSource, item: Awaited<ReturnTyp
     freshnessScore: computeFreshnessScore(publishedAt),
     clusterId: "pending-cluster",
     eventType,
-    heroGradient: pickHeroGradient(`${source.id}-${getPrimaryTopic({ tags } as Article)}`),
+    heroGradient: pickHeroGradient(`${source.id}-${primaryTopic}`),
+    imageUrl: item.imageUrl,
+    primaryTopic,
+    qualityScore: 0,
+  } satisfies Article;
+
+  return {
+    ...article,
+    qualityScore: computeQualityScore(article),
   } satisfies Article;
 }
 
@@ -447,19 +550,26 @@ function buildCatalog(articles: Article[]): FeedCatalog {
   const deduped: Article[] = [];
 
   for (const article of articles) {
-    if (!isDuplicateStory(article, deduped)) {
+    if (isRelevantAutomotiveStory(article) && !isDuplicateStory(article, deduped)) {
       deduped.push(article);
     }
   }
 
   const trimmed = deduped
-    .sort((left, right) => new Date(right.publishedAt).valueOf() - new Date(left.publishedAt).valueOf())
+    .sort((left, right) => {
+      const freshnessDelta = new Date(right.publishedAt).valueOf() - new Date(left.publishedAt).valueOf();
+
+      if (freshnessDelta !== 0) {
+        return freshnessDelta;
+      }
+
+      return (right.qualityScore ?? 0) - (left.qualityScore ?? 0);
+    })
     .slice(0, MAX_ARTICLES);
   const clustered = buildClusters(trimmed);
   const topicCollections = Array.from(
     new Set(clustered.articles.map((article) => toTopicCollectionLabel(getPrimaryTopic(article)))),
-  )
-    .slice(0, 8);
+  ).slice(0, 8);
 
   return {
     articles: clustered.articles,
@@ -497,7 +607,10 @@ export async function getFeedPayload(): Promise<FeedPayload> {
           ...cached.catalog,
           mode: "cached",
         },
-        reports: cached.reports.length > 0 ? cached.reports : [createOfflineReport("Using cached Supabase feed snapshot.")],
+        reports:
+          cached.reports.length > 0
+            ? cached.reports
+            : [createOfflineReport("Using cached Supabase feed snapshot.")],
       };
     }
 

@@ -15,6 +15,8 @@ export type FeedMode = "live" | "cached" | "seed";
 
 export type RemoteSyncStatus = "disabled" | "offline" | "syncing" | "synced" | "error";
 
+export type PersistenceMode = "disabled" | "device" | "account";
+
 export type UserProfile = {
   interests: string[];
   eras: string[];
@@ -45,6 +47,10 @@ export type Article = {
   clusterId: string;
   eventType: StoryEventType;
   heroGradient: string;
+  imageUrl?: string;
+  primaryTopic?: string;
+  clusterLabel?: string;
+  qualityScore?: number;
 };
 
 export type StoryCluster = {
@@ -55,6 +61,8 @@ export type StoryCluster = {
   leadStoryId: string;
   storyIds: string[];
   timeline: string[];
+  storyCount?: number;
+  sourceNames?: string[];
 };
 
 export type FeedCatalog = {
@@ -78,6 +86,21 @@ export type FeedSourceReport = {
 export type FeedPayload = {
   catalog: FeedCatalog;
   reports: FeedSourceReport[];
+};
+
+export type Viewer = {
+  id: string;
+  email: string;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+};
+
+export type StateBootstrapPayload = {
+  enabled: boolean;
+  authEnabled: boolean;
+  persistenceMode: PersistenceMode;
+  snapshot: StateSnapshot | null;
+  viewer: Viewer | null;
 };
 
 export type RankedArticle = Article & {

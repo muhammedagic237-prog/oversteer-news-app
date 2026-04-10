@@ -12,6 +12,9 @@ export function HomeScreen() {
     state,
     hydrated,
     catalog,
+    viewer,
+    authEnabled,
+    persistenceMode,
     feed,
     polePosition,
     recommendedTopics,
@@ -29,6 +32,13 @@ export function HomeScreen() {
   const leadStory = polePosition[0];
   const leadCluster = leadStory ? getClusterById(leadStory.clusterId, catalog) : null;
   const healthySources = sourceReports.filter((report) => report.ok).length;
+  const leadStageStyle = leadStory?.imageUrl
+    ? {
+        backgroundImage: `linear-gradient(125deg, rgba(7, 10, 13, 0.2) 0%, rgba(7, 10, 13, 0.78) 48%, rgba(7, 10, 13, 0.94) 100%), url(${leadStory.imageUrl})`,
+      }
+    : {
+        background: leadStory?.heroGradient,
+      };
 
   if (!hydrated) {
     return (
@@ -43,30 +53,38 @@ export function HomeScreen() {
 
   return (
     <main className="page page-feed">
-      <header className="topbar">
-        <div>
+      <header className="topbar topbar-feed">
+        <div className="brand-lockup">
           <p className="eyebrow">Trusted enthusiast feed</p>
           <h1>Oversteer</h1>
+          <p className="hero-copy brand-subtitle">
+            Swipe through the stories that actually matter to your lane.
+          </p>
         </div>
-        <div className="topbar-meta">
-          {state.profile.followedTopics.slice(0, 4).map((topic) => (
-            <button key={topic} type="button" className="pill" onClick={() => followTopic(topic)}>
-              {topic}
-            </button>
-          ))}
+        <div className="topbar-actions">
+          <div className="topbar-meta">
+            {state.profile.followedTopics.slice(0, 3).map((topic) => (
+              <button key={topic} type="button" className="pill" onClick={() => followTopic(topic)}>
+                {topic}
+              </button>
+            ))}
+          </div>
+          <Link href={viewer ? "/account" : "/login"} className="primary-button">
+            {viewer ? viewer.displayName ?? "Account" : authEnabled ? "Sign in" : "Auth pending"}
+          </Link>
         </div>
       </header>
 
       {!state.hasCompletedOnboarding ? (
-        <section className="hero-panel">
+        <section className="setup-banner">
           <div>
             <p className="eyebrow">Start here</p>
-            <h2>Build your lane so the app knows whether to lead with BMW launches or rally-era classics.</h2>
+            <h2>Build your lane so Oversteer knows whether to lead with BMW launches or rally-era classics.</h2>
           </div>
-          <div className="hero-actions">
+          <div className="setup-banner-actions">
             <p className="hero-copy">
-              The MVP now supports a live feed pipeline with seeded fallback. Finish onboarding
-              and your feed, Garage, and settings will start behaving like a real product.
+              The app is already live with feed ingestion, account sync, and clustering. Finish onboarding
+              and the lane becomes much sharper immediately.
             </p>
             <Link href="/onboarding" className="primary-button">
               Finish onboarding
@@ -76,13 +94,41 @@ export function HomeScreen() {
       ) : null}
 
       {leadStory ? (
-        <section className="hero-panel">
-          <div>
+        <section className="lead-stage" style={leadStageStyle}>
+          <div className="lead-stage-copy">
             <p className="eyebrow">Pole Position</p>
             <h2>{leadStory.title}</h2>
-          </div>
-          <div className="hero-actions">
+            <p className="lead-summary">{leadStory.summary}</p>
             <p className="hero-copy">{leadStory.deck}</p>
+            <div className="status-row">
+              <span className="status-pill">{leadStory.source}</span>
+              <span className="status-pill muted">{leadStory.publishedAgo}</span>
+              <span className="status-pill muted">{leadStory.primaryTopic ?? leadStory.tags[0]}</span>
+              <span className="status-pill muted">{Math.round((leadStory.qualityScore ?? 0.78) * 100)} quality</span>
+            </div>
+          </div>
+          <div className="lead-stage-sidebar">
+            <div className="lead-briefing">
+              <p className="eyebrow">Lane status</p>
+              <div className="briefing-grid">
+                <div>
+                  <strong>{feedLoading ? "Refreshing" : catalog.mode.toUpperCase()}</strong>
+                  <span>Feed state</span>
+                </div>
+                <div>
+                  <strong>{healthySources}/{sourceReports.length || 1}</strong>
+                  <span>Trusted sources up</span>
+                </div>
+                <div>
+                  <strong>{persistenceMode === "account" ? "Account" : persistenceMode === "device" ? "Device" : "Local"}</strong>
+                  <span>Persistence mode</span>
+                </div>
+                <div>
+                  <strong>{state.savedStoryIds.length}</strong>
+                  <span>Stories in Garage</span>
+                </div>
+              </div>
+            </div>
             <div className="button-row">
               <Link
                 href={`/story/${leadStory.id}`}
@@ -96,12 +142,15 @@ export function HomeScreen() {
                   Open Pit Wall
                 </Link>
               ) : null}
+              <Link href={viewer ? "/account" : "/login"} className="secondary-button">
+                {viewer ? "Open account" : "Create driver account"}
+              </Link>
             </div>
           </div>
         </section>
       ) : null}
 
-      <section className="panel" style={{ marginBottom: 24 }}>
+      <section className="lane-panel" style={{ marginBottom: 24 }}>
         <div className="section-heading">
           <div>
             <p className="eyebrow">Feed mode</p>
@@ -141,6 +190,13 @@ export function HomeScreen() {
             {healthySources > 0
               ? `${healthySources}/${sourceReports.length} trusted sources healthy`
               : "Seeded fallback active"}
+          </span>
+          <span className="status-pill muted">
+            {viewer
+              ? `Signed in as ${viewer.displayName ?? viewer.email.split("@")[0]}`
+              : authEnabled
+                ? "Auth ready"
+                : "Auth not configured"}
           </span>
         </div>
       </section>

@@ -3,6 +3,7 @@ export const primaryTabs = [
   { id: "explore", label: "Explore", href: "/explore" },
   { id: "garage", label: "Garage", href: "/garage" },
   { id: "settings", label: "Settings", href: "/settings" },
+  { id: "account", label: "Account", href: "/account" },
 ] as const;
 
 export const architectureSurfaces = [

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { AppNav } from "@/components/app-nav";
 import { useOversteer } from "@/components/oversteer-provider";
 import { rankingModes } from "@/lib/app-shell";
@@ -10,8 +12,11 @@ export function SettingsScreen() {
     state,
     hydrated,
     catalog,
+    viewer,
+    authEnabled,
     syncStatus,
     remoteSyncEnabled,
+    persistenceMode,
     setRankingMode,
     setSourceStyle,
     toggleFollowSource,
@@ -34,6 +39,31 @@ export function SettingsScreen() {
       </header>
 
       <section className="grid-panels">
+        <article className="panel">
+          <p className="eyebrow">Account</p>
+          <div className="setting-row">
+            <div>
+              <strong>
+                {viewer
+                  ? `Signed in as ${viewer.displayName ?? viewer.email}`
+                  : authEnabled
+                    ? "No driver account connected"
+                    : "Auth not configured"}
+              </strong>
+              <span>
+                {viewer
+                  ? "Your Oversteer lane can follow you across devices."
+                  : authEnabled
+                    ? "Create an account to sync your lane and Garage."
+                    : "Add Supabase public auth keys to unlock accounts."}
+              </span>
+            </div>
+            <Link href={viewer ? "/account" : "/login"} className="secondary-button">
+              {viewer ? "Open account" : "Sign in"}
+            </Link>
+          </div>
+        </article>
+
         <article className="panel">
           <p className="eyebrow">Ranking mode</p>
           <div className="chip-grid">
@@ -133,7 +163,7 @@ export function SettingsScreen() {
               <strong>{remoteSyncEnabled ? "Supabase snapshot sync active" : "Local-first mode"}</strong>
               <span>
                 {remoteSyncEnabled
-                  ? `Current status: ${syncStatus}.`
+                  ? `Current status: ${syncStatus}. Sync mode: ${persistenceMode}.`
                   : "Set Supabase env vars to sync preferences and saved stories across devices."}
               </span>
             </div>

@@ -36,6 +36,15 @@ export function StoryDetailScreen({ storyId }: { storyId: string }) {
   const relatedStories = hydrated
     ? getClusterStories(article.clusterId, state, catalog).filter((story) => story.id !== article.id)
     : [];
+  const storyShellStyle = article.imageUrl
+    ? {
+        backgroundImage: `linear-gradient(180deg, rgba(8, 10, 13, 0.18) 0%, rgba(8, 10, 13, 0.86) 80%, rgba(8, 10, 13, 0.95) 100%), url(${article.imageUrl})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+    : {
+        background: article.heroGradient,
+      };
 
   useEffect(() => {
     if (hydrated) {
@@ -52,12 +61,18 @@ export function StoryDetailScreen({ storyId }: { storyId: string }) {
         </div>
       </header>
 
-      <section className="story-detail-shell" style={{ background: article.heroGradient }}>
+      <section className="story-detail-shell" style={storyShellStyle}>
         <div className="news-card-content">
           <div className="news-card-header">
             <span className="source-pill">{article.source}</span>
             <span className="source-pill muted">{article.publishedAgo}</span>
             <span className="source-pill muted">{article.eventType}</span>
+            {article.primaryTopic ? (
+              <span className="source-pill muted">{article.primaryTopic}</span>
+            ) : null}
+            {article.qualityScore ? (
+              <span className="source-pill muted">{Math.round(article.qualityScore * 100)} quality</span>
+            ) : null}
           </div>
 
           <p className="story-summary">{article.summary}</p>
