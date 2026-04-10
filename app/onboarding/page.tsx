@@ -12,14 +12,15 @@ export default function OnboardingPage() {
 
       <section className="stacked-layout">
         <div className="info-panel">
-          <p className="eyebrow">Why this matters</p>
+          <p className="eyebrow">First-run tuning</p>
           <h2>
-            The onboarding flow should build a useful feed in under a minute and explain
-            why stories appear.
+            Set the lane once on first launch, then come back here only when you want to retune
+            the feed.
           </h2>
           <p>
-            Users should pick their favorite brands, eras, and motorsport topics once and
-            immediately feel that the feed understands them.
+            Pick brands, eras, motorsport interests, and watchlist models so Oversteer can lead
+            with the right stories and keep the main feed feeling like a car-only app, not a
+            generic news stream.
           </p>
         </div>
 

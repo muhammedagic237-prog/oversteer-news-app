@@ -1,5 +1,5 @@
-import { ExploreScreen } from "@/components/explore-screen";
+import { redirect } from "next/navigation";
 
 export default function ExplorePage() {
-  return <ExploreScreen />;
+  redirect("/tech");
 }

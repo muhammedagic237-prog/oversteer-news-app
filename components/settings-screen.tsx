@@ -41,6 +41,26 @@ export function SettingsScreen() {
 
       <section className="grid-panels">
         <article className="panel">
+          <p className="eyebrow">Lane setup</p>
+          <div className="setting-row">
+            <div>
+              <strong>
+                {state.hasCompletedOnboarding
+                  ? "First-run setup complete"
+                  : "First-run setup still pending"}
+              </strong>
+              <span>
+                Oversteer only forces onboarding once, but you can always retune your interests,
+                eras, motorsport mix, and watchlists later.
+              </span>
+            </div>
+            <Link href="/onboarding" className="secondary-button">
+              Retune lane
+            </Link>
+          </div>
+        </article>
+
+        <article className="panel">
           <p className="eyebrow">Account</p>
           <div className="setting-row">
             <div>
@@ -61,6 +81,22 @@ export function SettingsScreen() {
             </div>
             <Link href={viewer ? "/account" : "/login"} className="secondary-button">
               {viewer ? "Open account" : "Sign in"}
+            </Link>
+          </div>
+        </article>
+
+        <article className="panel">
+          <p className="eyebrow">Tech Center</p>
+          <div className="setting-row">
+            <div>
+              <strong>Open the How it works? section</strong>
+              <span>
+                Browse the ZF-first gearbox library, official-source media, and maintenance
+                guidance without leaving the app.
+              </span>
+            </div>
+            <Link href="/tech" className="secondary-button">
+              Open Tech Center
             </Link>
           </div>
         </article>

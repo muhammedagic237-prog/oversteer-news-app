@@ -5,7 +5,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Oversteer",
-  description: "A trusted, relevance-ranked car news feed for enthusiasts.",
+  description:
+    "A photo-first car news app with a personalized enthusiast feed and a ZF-first gearbox tech center.",
   applicationName: "Oversteer",
   manifest: "/manifest.webmanifest",
   formatDetection: {

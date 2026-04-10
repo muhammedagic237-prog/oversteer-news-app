@@ -11,6 +11,7 @@ type RssItem = {
   summary?: string;
   enclosure?: { "@_url"?: string };
   "media:content"?: { "@_url"?: string } | Array<{ "@_url"?: string }>;
+  "media:thumbnail"?: { "@_url"?: string } | Array<{ "@_url"?: string }>;
 };
 
 export type ParsedFeedItem = {
@@ -55,11 +56,28 @@ function resolveLink(item: RssItem) {
   return item.link?.href?.trim() ?? "";
 }
 
+function extractImageFromHtml(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  const compact = value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
+  const match = compact.match(/<img[^>]+src=["']([^"']+)["']/i);
+
+  return match?.[1];
+}
+
 function resolveImage(item: RssItem) {
   const media = toArray(item["media:content"]);
   const mediaUrl = media.find((entry) => entry?.["@_url"])?.["@_url"];
+  const thumbnails = toArray(item["media:thumbnail"]);
+  const thumbnailUrl = thumbnails.find((entry) => entry?.["@_url"])?.["@_url"];
+  const htmlImage =
+    extractImageFromHtml(item["content:encoded"]) ??
+    extractImageFromHtml(item.description) ??
+    extractImageFromHtml(item.summary);
 
-  return mediaUrl ?? item.enclosure?.["@_url"];
+  return mediaUrl ?? thumbnailUrl ?? item.enclosure?.["@_url"] ?? htmlImage;
 }
 
 export function parseFeedXml(xml: string): ParsedFeedItem[] {

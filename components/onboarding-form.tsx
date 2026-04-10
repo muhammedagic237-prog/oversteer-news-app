@@ -16,6 +16,7 @@ import {
 export function OnboardingForm() {
   const router = useRouter();
   const { state, hydrated, completeOnboarding } = useOversteer();
+  const isRetune = state.hasCompletedOnboarding;
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [selectedEras, setSelectedEras] = useState<string[]>([]);
   const [selectedMotorsport, setSelectedMotorsport] = useState<string[]>([]);
@@ -179,17 +180,20 @@ export function OnboardingForm() {
       </div>
 
       <div className="preview-panel">
-        <p className="eyebrow">Feed preview</p>
-        <h4>BMW teases lighter M2 CS with heritage-inspired tuning details</h4>
+        <p className="eyebrow">{isRetune ? "Updated lane preview" : "Feed preview"}</p>
+        <h4>
+          {(selectedInterests[0] ?? "BMW")} coverage with original-source photos, faster filtering,
+          and a cleaner swipe feed
+        </h4>
         <p className="onboarding-copy">{previewReason}</p>
       </div>
 
       <div className="button-row">
         <button type="button" className="primary-button" onClick={handleComplete}>
-          Build my feed
+          {isRetune ? "Update my lane" : "Build my feed"}
         </button>
         <button type="button" className="secondary-button" onClick={() => router.push("/")}>
-          Skip for now
+          {isRetune ? "Back to feed" : "Skip for now"}
         </button>
       </div>
     </section>

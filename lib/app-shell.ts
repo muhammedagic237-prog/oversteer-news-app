@@ -1,19 +1,9 @@
 export const primaryTabs = [
   { id: "feed", label: "Feed", href: "/" },
-  { id: "explore", label: "Explore", href: "/explore" },
+  { id: "tech", label: "Tech", href: "/tech" },
   { id: "garage", label: "Garage", href: "/garage" },
   { id: "settings", label: "Settings", href: "/settings" },
   { id: "account", label: "Account", href: "/account" },
-] as const;
-
-export const architectureSurfaces = [
-  "Pole Position",
-  "Your Lane",
-  "Pit Wall",
-  "Explore",
-  "Garage",
-  "Alerts",
-  "Settings",
 ] as const;
 
 export const rankingModes = [

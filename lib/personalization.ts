@@ -24,7 +24,7 @@ export function getDefaultState(): AppState {
     hiddenStoryIds: [],
     openedStoryIds: [],
     hiddenSourceIds: [],
-    currentSurface: "pole-position",
+    currentSurface: "your-lane",
     updatedAt: new Date().toISOString(),
   };
 }
@@ -52,13 +52,16 @@ function scoreRankingMode(mode: RankingMode, article: RankedArticle) {
   }
 }
 
+function normalizeModel(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
 export function getPersonalizedFeed(
   state: AppState,
   catalog: FeedCatalog = seedFeedCatalog,
 ): RankedArticle[] {
   const { profile, hiddenStoryIds, hiddenSourceIds, savedStoryIds, openedStoryIds } = state;
-
-  return catalog.articles
+  const ranked = catalog.articles
     .filter(
       (article) =>
         !hiddenStoryIds.includes(article.id) &&
@@ -72,38 +75,56 @@ export function getPersonalizedFeed(
       const eraMatches = article.tags.filter((tag) => profile.eras.includes(tag));
       const motorsportMatches = article.tags.filter((tag) => profile.motorsport.includes(tag));
       const regionMatches = article.regions.filter((region) => profile.regions.includes(region));
+      const watchlistMatches = profile.watchlistModels.filter((model) =>
+        normalizeModel(`${article.title} ${article.summary}`).includes(normalizeModel(model)),
+      );
       const sourceBonus = profile.followedSources.includes(article.source) ? 12 : 0;
       const saveBonus = savedStoryIds.includes(article.id) ? 8 : 0;
       const openedBonus = openedStoryIds.includes(article.id) ? 5 : 0;
       const trustBonus = Math.round(article.trustScore * 20);
       const freshnessBonus = Math.round(article.freshnessScore * 15);
       const styleBonus = scoreSourceStyle(article.sourceStyle, profile);
+      const imageBonus = article.imageUrl ? 6 : 0;
+      const laneSignalCount =
+        interestMatches.length +
+        eraMatches.length +
+        motorsportMatches.length +
+        regionMatches.length +
+        watchlistMatches.length +
+        (profile.followedSources.includes(article.source) ? 1 : 0);
 
       const baseArticle = {
         ...article,
         score: 0,
         reason: "",
+        laneSignalCount,
       };
 
       const modeBonus = scoreRankingMode(profile.rankingMode, baseArticle);
+      const unmatchedPenalty =
+        state.hasCompletedOnboarding && laneSignalCount === 0 ? 28 : 0;
 
       const score =
         interestMatches.length * 22 +
         eraMatches.length * 14 +
         motorsportMatches.length * 18 +
         regionMatches.length * 8 +
+        watchlistMatches.length * 26 +
         sourceBonus +
         saveBonus +
         openedBonus +
         trustBonus +
         freshnessBonus +
         styleBonus +
-        modeBonus;
+        imageBonus +
+        modeBonus -
+        unmatchedPenalty;
 
       const reasonParts = [
         interestMatches[0] ? `Matches ${interestMatches.slice(0, 2).join(" and ")}` : null,
         eraMatches[0] ? `fits your ${eraMatches[0]} preference` : null,
         motorsportMatches[0] ? `tracks your ${motorsportMatches[0]} lane` : null,
+        watchlistMatches[0] ? `hits your ${watchlistMatches[0]} watchlist` : null,
         profile.followedSources.includes(article.source) ? `from a followed source` : "trusted source weighting",
       ].filter((value): value is string => Boolean(value));
 
@@ -114,6 +135,16 @@ export function getPersonalizedFeed(
       };
     })
     .sort((left, right) => right.score - left.score);
+
+  if (!state.hasCompletedOnboarding) {
+    return ranked;
+  }
+
+  const focusedLane = ranked.filter(
+    (article) => article.laneSignalCount > 0 || article.score >= 58,
+  );
+
+  return focusedLane.length >= 8 ? focusedLane : ranked;
 }
 
 export function getPolePosition(state: AppState, catalog: FeedCatalog = seedFeedCatalog) {

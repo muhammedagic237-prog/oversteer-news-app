@@ -84,6 +84,7 @@ export function NewsCard({
         <div className="metric-row">
           <span>{Math.round(article.trustScore * 100)} trust</span>
           <span>{Math.round((article.qualityScore ?? article.freshnessScore) * 100)} quality</span>
+          <span>{article.laneSignalCount} lane matches</span>
           <span>{article.clusterLabel ?? "Single angle"}</span>
         </div>
 
@@ -116,6 +117,9 @@ export function NewsCard({
           <button type="button" onClick={() => onToggleSave(article.id)}>
             {isSaved ? "Saved" : "Save"}
           </button>
+          <a href={article.sourceUrl} className="pill" target="_blank" rel="noreferrer">
+            Open source
+          </a>
           <button type="button" onClick={() => onMuteTopic(actionTopic)}>
             Less like this
           </button>

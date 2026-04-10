@@ -125,6 +125,7 @@ export type StateBootstrapPayload = {
 export type RankedArticle = Article & {
   score: number;
   reason: string;
+  laneSignalCount: number;
 };
 
 export type AppState = {
