@@ -85,6 +85,42 @@ Useful routes:
 - Supabase is optional. Without it, the app still works with local storage plus seeded fallback.
 - `GET /api/health` gives you a quick readiness check after deployment.
 
+## Mobile Shell Notes
+
+Oversteer is now shaped to survive the jump from web app to wrapped mobile app:
+
+- safe-area aware layout and bottom navigation
+- install metadata via [manifest.ts](/C:/Users/HP/Documents/New%20project/oversteer-news-app/app/manifest.ts)
+- generated app icons via [icon.tsx](/C:/Users/HP/Documents/New%20project/oversteer-news-app/app/icon.tsx) and [apple-icon.tsx](/C:/Users/HP/Documents/New%20project/oversteer-news-app/app/apple-icon.tsx)
+- local feed cache plus local-first state persistence
+- foreground/background refresh so returning to the app reloads feed and sync state
+
+That means the web build should already feel much closer to a future Capacitor shell instead of a desktop site squeezed onto a phone.
+
+## Capacitor Foundation
+
+Capacitor is now installed with:
+
+- `@capacitor/core`
+- `@capacitor/cli`
+
+Base config lives in [capacitor.config.ts](/C:/Users/HP/Documents/New%20project/oversteer-news-app/capacitor.config.ts).
+
+Useful commands:
+
+```bash
+npm run cap:doctor
+npm run cap -- --help
+```
+
+Important limitation right now:
+
+- this repo is still a dynamic Next.js app with server routes and live APIs
+- Capacitor's `server.url` setting is intended for live reload, not production
+- the final native bundle strategy still needs to be chosen before the first real `cap sync`
+
+So this step gives us the Capacitor project foundation only. Native platform generation and the actual iOS wrapper flow come next.
+
 ## Source Shape
 
 The live pipeline currently leans on official or publisher-hosted RSS endpoints from:

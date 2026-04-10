@@ -17,6 +17,25 @@ export type RemoteSyncStatus = "disabled" | "offline" | "syncing" | "synced" | "
 
 export type PersistenceMode = "disabled" | "device" | "account";
 
+export type RuntimeShellMode =
+  | "browser"
+  | "standalone-web"
+  | "capacitor-ios"
+  | "capacitor-android";
+
+export type RuntimeShell = {
+  mode: RuntimeShellMode;
+  label: string;
+  guidance: string;
+  ios: boolean;
+  android: boolean;
+  mobile: boolean;
+  standalone: boolean;
+  nativeWrapper: boolean;
+  canShare: boolean;
+  prefersReducedMotion: boolean;
+};
+
 export type UserProfile = {
   interests: string[];
   eras: string[];

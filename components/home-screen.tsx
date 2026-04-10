@@ -15,6 +15,7 @@ export function HomeScreen() {
     viewer,
     authEnabled,
     persistenceMode,
+    runtimeShell,
     feed,
     polePosition,
     recommendedTopics,
@@ -63,6 +64,7 @@ export function HomeScreen() {
         </div>
         <div className="topbar-actions">
           <div className="topbar-meta">
+            <span className="status-pill muted">{runtimeShell.label}</span>
             {state.profile.followedTopics.slice(0, 3).map((topic) => (
               <button key={topic} type="button" className="pill" onClick={() => followTopic(topic)}>
                 {topic}
@@ -92,6 +94,36 @@ export function HomeScreen() {
           </div>
         </section>
       ) : null}
+
+      <section className="panel shell-panel">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Mobile shell</p>
+            <h2 className="section-title">
+              Ready for edge-to-edge phones and the eventual Capacitor wrap.
+            </h2>
+          </div>
+          <span className="status-pill muted">
+            {runtimeShell.nativeWrapper
+              ? "Native shell"
+              : runtimeShell.standalone
+                ? "Installed shell"
+                : "Browser shell"}
+          </span>
+        </div>
+        <p className="hero-copy">{runtimeShell.guidance}</p>
+        <div className="status-row">
+          <span className="status-pill muted">
+            {runtimeShell.mobile ? "Phone-first layout active" : "Desktop preview mode"}
+          </span>
+          <span className="status-pill muted">
+            {runtimeShell.canShare ? "Web Share available" : "Standard browser sharing only"}
+          </span>
+          <span className="status-pill muted">
+            {runtimeShell.prefersReducedMotion ? "Reduced motion respected" : "Standard motion profile"}
+          </span>
+        </div>
+      </section>
 
       {leadStory ? (
         <section className="lead-stage" style={leadStageStyle}>
@@ -126,6 +158,12 @@ export function HomeScreen() {
                 <div>
                   <strong>{state.savedStoryIds.length}</strong>
                   <span>Stories in Garage</span>
+                </div>
+                <div>
+                  <strong>
+                    {runtimeShell.nativeWrapper ? "Native" : runtimeShell.mobile ? "Phone web" : "Browser"}
+                  </strong>
+                  <span>Shell mode</span>
                 </div>
               </div>
             </div>
@@ -198,6 +236,7 @@ export function HomeScreen() {
                 ? "Auth ready"
                 : "Auth not configured"}
           </span>
+          <span className="status-pill muted">{runtimeShell.label}</span>
         </div>
       </section>
 

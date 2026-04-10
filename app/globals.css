@@ -1,5 +1,9 @@
 :root {
   color-scheme: dark;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
   --bg: #080b0f;
   --bg-top: #121922;
   --panel: rgba(15, 20, 27, 0.8);
@@ -25,6 +29,7 @@
 
 html {
   min-height: 100%;
+  -webkit-text-size-adjust: 100%;
   background:
     radial-gradient(circle at 20% 0%, rgba(227, 155, 77, 0.18), transparent 28%),
     radial-gradient(circle at 85% 10%, rgba(104, 128, 156, 0.16), transparent 24%),
@@ -34,6 +39,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100svh;
   color: var(--text);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 20%),
@@ -45,6 +51,9 @@ body {
       transparent 140px
     );
   font-family: "Aptos", "Trebuchet MS", sans-serif;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 a {
@@ -53,8 +62,11 @@ a {
 }
 
 button,
-input {
+input,
+textarea,
+select {
   font: inherit;
+  touch-action: manipulation;
 }
 
 button {
@@ -65,15 +77,23 @@ main {
   isolation: isolate;
 }
 
+.app-body {
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
 .page,
 .auth-page {
   width: min(calc(100% - 32px), var(--max-width));
   margin: 0 auto;
-  padding: 28px 0 120px;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: calc(24px + var(--safe-top)) max(0px, var(--safe-right))
+    calc(120px + var(--safe-bottom)) max(0px, var(--safe-left));
 }
 
 .page-feed {
-  padding-bottom: 160px;
+  padding-bottom: calc(168px + var(--safe-bottom));
 }
 
 .topbar {
@@ -154,12 +174,14 @@ main {
 .onboarding-panel,
 .lane-panel,
 .setup-banner,
-.auth-panel {
+.auth-panel,
+.shell-panel {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .hero-panel,
@@ -203,6 +225,13 @@ main {
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
     var(--panel);
   animation: rise 420ms ease;
+}
+
+.shell-panel {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 22px 24px;
 }
 
 .setup-banner h2 {
@@ -390,6 +419,7 @@ main {
 .secondary-button,
 .pill,
 .ghost-button {
+  min-height: 46px;
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 10px 14px;
@@ -441,6 +471,9 @@ main {
   display: grid;
   gap: 20px;
   scroll-snap-type: y mandatory;
+  scroll-padding-top: calc(18px + var(--safe-top));
+  scroll-padding-bottom: calc(108px + var(--safe-bottom));
+  overscroll-behavior-y: contain;
 }
 
 .news-card {
@@ -454,8 +487,10 @@ main {
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
   scroll-snap-align: start;
+  scroll-snap-stop: always;
   content-visibility: auto;
   contain-intrinsic-size: 960px;
+  touch-action: pan-y;
 }
 
 .news-card-media {
@@ -628,6 +663,7 @@ main {
   display: grid;
   align-items: center;
   min-height: 100vh;
+  min-height: 100svh;
 }
 
 .auth-hero,
@@ -719,20 +755,28 @@ main {
 .app-nav {
   position: fixed;
   left: 50%;
-  bottom: 22px;
+  bottom: max(12px, calc(12px + var(--safe-bottom)));
   transform: translateX(-50%);
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  width: min(calc(100% - 24px), 720px);
+  min-height: 68px;
   padding: 10px;
   border-radius: 999px;
   background: rgba(8, 11, 15, 0.88);
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
   backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .app-nav-link {
-  padding: 10px 14px;
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  min-height: 48px;
   border-radius: 999px;
   color: var(--muted);
 }
@@ -782,8 +826,9 @@ main {
 @media (max-width: 720px) {
   .page,
   .auth-page {
-    width: min(calc(100% - 20px), var(--max-width));
-    padding-top: 20px;
+    width: min(calc(100% - 14px), var(--max-width));
+    padding-top: calc(14px + var(--safe-top));
+    padding-bottom: calc(116px + var(--safe-bottom));
   }
 
   .panel,
@@ -801,7 +846,7 @@ main {
 
   .lead-stage,
   .news-card {
-    min-height: auto;
+    min-height: 70svh;
     border-radius: 26px;
     padding: 20px;
   }
@@ -823,8 +868,13 @@ main {
   }
 
   .app-nav {
-    width: calc(100% - 20px);
-    justify-content: center;
-    overflow-x: auto;
+    width: calc(100% - 14px);
+    padding: 8px;
+    border-radius: 24px;
+  }
+
+  .app-nav-link {
+    font-size: 0.82rem;
+    padding: 10px 8px;
   }
 }

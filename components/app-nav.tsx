@@ -12,8 +12,9 @@ export function AppNav({ current }: { current: Tab }) {
           key={tab.id}
           href={tab.href}
           className={`app-nav-link ${current === tab.id ? "active" : ""}`}
+          aria-current={current === tab.id ? "page" : undefined}
         >
-          {tab.label}
+          <span>{tab.label}</span>
         </Link>
       ))}
     </nav>

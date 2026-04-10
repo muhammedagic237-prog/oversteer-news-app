@@ -17,6 +17,7 @@ export function SettingsScreen() {
     syncStatus,
     remoteSyncEnabled,
     persistenceMode,
+    runtimeShell,
     setRankingMode,
     setSourceStyle,
     toggleFollowSource,
@@ -153,6 +154,23 @@ export function SettingsScreen() {
                 </button>
               ))
             )}
+          </div>
+        </article>
+
+        <article className="panel">
+          <p className="eyebrow">Shell readiness</p>
+          <div className="setting-row">
+            <div>
+              <strong>{runtimeShell.label}</strong>
+              <span>{runtimeShell.guidance}</span>
+            </div>
+            <span className="status-pill muted">
+              {runtimeShell.nativeWrapper
+                ? "Capacitor"
+                : runtimeShell.standalone
+                  ? "Standalone"
+                  : "Browser"}
+            </span>
           </div>
         </article>
 

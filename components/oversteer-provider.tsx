@@ -2,11 +2,13 @@
 
 import {
   createContext,
+  startTransition,
   useContext,
   useEffect,
   useEffectEvent,
   useMemo,
   useReducer,
+  useRef,
   useState,
 } from "react";
 import { usePathname } from "next/navigation";
@@ -19,6 +21,7 @@ import {
   getPolePosition,
   getRecommendedTopics,
 } from "@/lib/personalization";
+import { detectRuntimeShell } from "@/lib/runtime-shell";
 import type {
   AppState,
   FeedCatalog,
@@ -27,6 +30,7 @@ import type {
   PersistenceMode,
   RankingMode,
   RemoteSyncStatus,
+  RuntimeShell,
   SourceStyle,
   StateBootstrapPayload,
   StateSnapshot,
@@ -36,6 +40,7 @@ import type {
 } from "@/lib/types";
 
 const STORAGE_KEY = "oversteer.momentum.v2";
+const FEED_CACHE_KEY = "oversteer.feed-cache.v1";
 const DEVICE_KEY = "oversteer.device-id.v1";
 
 type OversteerContextValue = {
@@ -49,6 +54,7 @@ type OversteerContextValue = {
   persistenceMode: PersistenceMode;
   authEnabled: boolean;
   viewer: Viewer | null;
+  runtimeShell: RuntimeShell;
   feed: ReturnType<typeof getPersonalizedFeed>;
   polePosition: ReturnType<typeof getPolePosition>;
   recommendedTopics: string[];
@@ -112,6 +118,36 @@ function stampState(nextState: AppState): AppState {
     ...nextState,
     updatedAt: new Date().toISOString(),
   };
+}
+
+function readLocalJson<T>(key: string) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(key);
+
+    if (!raw) {
+      return null;
+    }
+
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalJson(key: string, value: unknown) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore storage failures and keep the in-memory session moving.
+  }
 }
 
 function reducer(state: AppState, action: Action): AppState {
@@ -255,13 +291,22 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
   const [viewer, setViewer] = useState<Viewer | null>(null);
   const [persistenceMode, setPersistenceMode] = useState<PersistenceMode>("disabled");
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [runtimeShell, setRuntimeShell] = useState<RuntimeShell>(detectRuntimeShell());
+  const lastForegroundRefreshAt = useRef(0);
+  const stateRef = useRef(state);
   const pathname = usePathname();
 
-  const loadFeed = useEffectEvent(async () => {
-    setFeedLoading(true);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  const loadFeed = useEffectEvent(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setFeedLoading(true);
+    }
 
     try {
-      const response = await fetch("/api/feed");
+      const response = await fetch("/api/feed", { cache: "no-store" });
 
       if (!response.ok) {
         throw new Error(`Feed request failed with ${response.status}.`);
@@ -269,13 +314,31 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
 
       const payload = (await response.json()) as FeedPayload;
 
-      setCatalog(payload.catalog);
-      setSourceReports(payload.reports);
+      startTransition(() => {
+        setCatalog(payload.catalog);
+        setSourceReports(payload.reports);
+      });
+      writeLocalJson(FEED_CACHE_KEY, payload);
     } catch {
-      setCatalog(seedFeedCatalog);
-      setSourceReports([
-        createOfflineReport("Feed API unavailable. Using the seeded editorial lane."),
-      ]);
+      const cachedFeed = readLocalJson<FeedPayload>(FEED_CACHE_KEY);
+
+      if (cachedFeed?.catalog?.articles?.length) {
+        startTransition(() => {
+          setCatalog(cachedFeed.catalog);
+          setSourceReports(
+            cachedFeed.reports.length > 0
+              ? cachedFeed.reports
+              : [createOfflineReport("Feed API unavailable. Using the last cached editorial lane.")],
+          );
+        });
+      } else {
+        startTransition(() => {
+          setCatalog(seedFeedCatalog);
+          setSourceReports([
+            createOfflineReport("Feed API unavailable. Using the seeded editorial lane."),
+          ]);
+        });
+      }
     } finally {
       setFeedLoading(false);
     }
@@ -283,90 +346,161 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
 
   const remoteSyncEnabled = persistenceMode !== "disabled";
 
-  const hydrateRemoteState = useEffectEvent(async (resolvedDeviceId: string, localState: AppState) => {
-    try {
-      const response = await fetch(`/api/state?deviceId=${encodeURIComponent(resolvedDeviceId)}`);
+  const hydrateRemoteState = useEffectEvent(
+    async (resolvedDeviceId: string, options?: { silent?: boolean }) => {
+      try {
+        const response = await fetch(`/api/state?deviceId=${encodeURIComponent(resolvedDeviceId)}`, {
+          cache: "no-store",
+        });
 
-      if (!response.ok) {
-        throw new Error(`State request failed with ${response.status}.`);
+        if (!response.ok) {
+          throw new Error(`State request failed with ${response.status}.`);
+        }
+
+        const payload = (await response.json()) as StateBootstrapPayload;
+
+        setAuthEnabled(payload.authEnabled);
+        setViewer(payload.viewer);
+        setPersistenceMode(payload.persistenceMode);
+
+        if (!payload.enabled) {
+          setSyncStatus("disabled");
+          return;
+        }
+
+        if (payload.snapshot) {
+          const remoteSnapshot = payload.snapshot;
+          const remoteUpdatedAt = new Date(remoteSnapshot.updatedAt).valueOf();
+          const localUpdatedAt = new Date(stateRef.current.updatedAt).valueOf();
+
+          if (remoteUpdatedAt > localUpdatedAt) {
+            startTransition(() => {
+              dispatch({ type: "hydrate", payload: mergeState(remoteSnapshot.state) });
+            });
+          }
+        }
+
+        setSyncStatus("synced");
+      } catch {
+        if (!options?.silent) {
+          setPersistenceMode("disabled");
+        }
+
+        setSyncStatus((current) => (current === "disabled" ? current : "offline"));
       }
+    },
+  );
 
-      const payload = (await response.json()) as StateBootstrapPayload;
-
-      setAuthEnabled(payload.authEnabled);
-      setViewer(payload.viewer);
-      setPersistenceMode(payload.persistenceMode);
-
-      if (!payload.enabled) {
-        setSyncStatus("disabled");
+  const syncRemoteState = useEffectEvent(
+    async (snapshot: StateSnapshot, options?: { silent?: boolean; keepalive?: boolean }) => {
+      if (!remoteSyncEnabled) {
         return;
       }
 
-      if (payload.snapshot) {
-        const remoteUpdatedAt = new Date(payload.snapshot.updatedAt).valueOf();
-        const localUpdatedAt = new Date(localState.updatedAt).valueOf();
-
-        if (remoteUpdatedAt > localUpdatedAt) {
-          dispatch({ type: "hydrate", payload: mergeState(payload.snapshot.state) });
-        }
+      if (!options?.silent) {
+        setSyncStatus("syncing");
       }
 
-      setSyncStatus("synced");
-    } catch {
-      setPersistenceMode("disabled");
-      setSyncStatus("offline");
-    }
-  });
+      try {
+        const response = await fetch("/api/state", {
+          method: "PUT",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(snapshot),
+          keepalive: options?.keepalive,
+        });
 
-  const syncRemoteState = useEffectEvent(async (snapshot: StateSnapshot) => {
-    if (!remoteSyncEnabled) {
+        if (!response.ok) {
+          throw new Error(`State sync failed with ${response.status}.`);
+        }
+
+        const payload = (await response.json().catch(() => null)) as
+          | { enabled?: boolean; persistenceMode?: PersistenceMode; viewer?: Viewer | null }
+          | null;
+
+        if (payload?.persistenceMode) {
+          setPersistenceMode(payload.persistenceMode);
+        }
+
+        if (payload?.viewer !== undefined) {
+          setViewer(payload.viewer);
+        }
+
+        if (payload?.enabled === false) {
+          setSyncStatus("disabled");
+          return;
+        }
+
+        setSyncStatus("synced");
+      } catch {
+        setSyncStatus((current) => {
+          if (current === "disabled") {
+            return current;
+          }
+
+          return options?.silent ? "offline" : "error";
+        });
+      }
+    },
+  );
+
+  const flushRemoteSnapshot = useEffectEvent(async (options?: { keepalive?: boolean }) => {
+    if (!hydrated || !deviceId || !remoteSyncEnabled) {
       return;
     }
 
-    setSyncStatus("syncing");
+    await syncRemoteState(
+      {
+        deviceId,
+        state: stateRef.current,
+        updatedAt: stateRef.current.updatedAt,
+      },
+      {
+        silent: true,
+        keepalive: options?.keepalive,
+      },
+    );
+  });
 
-    try {
-      const response = await fetch("/api/state", {
-        method: "PUT",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(snapshot),
-      });
+  const refreshForegroundState = useEffectEvent(async () => {
+    setRuntimeShell(detectRuntimeShell());
 
-      if (!response.ok) {
-        throw new Error(`State sync failed with ${response.status}.`);
-      }
+    const now = Date.now();
 
-      setSyncStatus("synced");
-    } catch {
-      setSyncStatus("error");
+    if (now - lastForegroundRefreshAt.current < 15000) {
+      return;
+    }
+
+    lastForegroundRefreshAt.current = now;
+
+    await loadFeed({ silent: true });
+
+    if (deviceId) {
+      await hydrateRemoteState(deviceId, { silent: true });
     }
   });
 
   useEffect(() => {
-    const localState = (() => {
-      try {
-        const raw = window.localStorage.getItem(STORAGE_KEY);
-
-        if (!raw) {
-          return getDefaultState();
-        }
-
-        return mergeState(JSON.parse(raw) as Partial<AppState>);
-      } catch {
-        return getDefaultState();
-      }
-    })();
-
-    dispatch({ type: "hydrate", payload: localState });
-
+    const localState = mergeState(readLocalJson<Partial<AppState>>(STORAGE_KEY));
+    const cachedFeed = readLocalJson<FeedPayload>(FEED_CACHE_KEY);
     const storedDeviceId = window.localStorage.getItem(DEVICE_KEY);
     const resolvedDeviceId = storedDeviceId ?? crypto.randomUUID();
 
     if (!storedDeviceId) {
       window.localStorage.setItem(DEVICE_KEY, resolvedDeviceId);
     }
+
+    startTransition(() => {
+      dispatch({ type: "hydrate", payload: localState });
+
+      if (cachedFeed?.catalog?.articles?.length) {
+        setCatalog(cachedFeed.catalog);
+        setSourceReports(cachedFeed.reports);
+      }
+
+      setRuntimeShell(detectRuntimeShell());
+    });
 
     setDeviceId(resolvedDeviceId);
     setHydrated(true);
@@ -378,7 +512,7 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    void hydrateRemoteState(deviceId, state);
+    void hydrateRemoteState(deviceId);
   }, [deviceId, hydrated, hydrateRemoteState, pathname]);
 
   useEffect(() => {
@@ -386,7 +520,7 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    writeLocalJson(STORAGE_KEY, state);
   }, [hydrated, state]);
 
   useEffect(() => {
@@ -405,6 +539,97 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(timer);
   }, [deviceId, hydrated, remoteSyncEnabled, state, syncRemoteState]);
 
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    writeLocalJson(FEED_CACHE_KEY, {
+      catalog,
+      reports: sourceReports,
+    } satisfies FeedPayload);
+  }, [catalog, hydrated, sourceReports]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+      const { newValue } = event;
+
+      if (event.storageArea !== window.localStorage || !newValue) {
+        return;
+      }
+
+      if (event.key === STORAGE_KEY) {
+        try {
+          startTransition(() => {
+            dispatch({ type: "hydrate", payload: mergeState(JSON.parse(newValue)) });
+          });
+        } catch {
+          // Ignore malformed external state writes.
+        }
+      }
+
+      if (event.key === FEED_CACHE_KEY) {
+        try {
+          const payload = JSON.parse(newValue) as FeedPayload;
+
+          if (payload.catalog?.articles?.length) {
+            startTransition(() => {
+              setCatalog(payload.catalog);
+              setSourceReports(payload.reports);
+            });
+          }
+        } catch {
+          // Ignore malformed external feed cache writes.
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    const handleVisibleChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshForegroundState();
+        return;
+      }
+
+      void flushRemoteSnapshot({ keepalive: true });
+    };
+
+    const handleForeground = () => {
+      void refreshForegroundState();
+    };
+
+    const handlePageHide = () => {
+      void flushRemoteSnapshot({ keepalive: true });
+    };
+
+    window.addEventListener("pageshow", handleForeground);
+    window.addEventListener("focus", handleForeground);
+    window.addEventListener("online", handleForeground);
+    window.addEventListener("pagehide", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibleChange);
+
+    return () => {
+      window.removeEventListener("pageshow", handleForeground);
+      window.removeEventListener("focus", handleForeground);
+      window.removeEventListener("online", handleForeground);
+      window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibleChange);
+    };
+  }, [flushRemoteSnapshot, hydrated, refreshForegroundState]);
+
   const value = useMemo<OversteerContextValue>(
     () => ({
       state,
@@ -417,6 +642,7 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
       persistenceMode,
       authEnabled,
       viewer,
+      runtimeShell,
       feed: getPersonalizedFeed(state, catalog),
       polePosition: getPolePosition(state, catalog),
       recommendedTopics: getRecommendedTopics(state, catalog),
@@ -442,12 +668,13 @@ export function OversteerProvider({ children }: { children: React.ReactNode }) {
       setSurface: (surface) => dispatch({ type: "setSurface", payload: surface }),
     }),
     [
-      catalog,
       authEnabled,
+      catalog,
       feedLoading,
       hydrated,
       persistenceMode,
       remoteSyncEnabled,
+      runtimeShell,
       sourceReports,
       state,
       syncStatus,
